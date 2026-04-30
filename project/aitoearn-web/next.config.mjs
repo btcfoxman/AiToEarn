@@ -32,15 +32,30 @@ const nextConfig = {
   productionBrowserSourceMaps: process.env.NEXT_PUBLIC_EVN === 'dev',
   rewrites: async () => {
     const rewrites = []
+    const isDev = process.env.NODE_ENV === 'development'
+    const apiProxyUrl = process.env.API_PROXY_URL || (isDev ? 'http://127.0.0.1:3002' : '')
+    const aiApiProxyUrl = process.env.AI_API_PROXY_URL || (isDev ? 'http://127.0.0.1:3010' : '')
+
+    if (aiApiProxyUrl) {
+      rewrites.push({
+        source: '/api/ai/:path*',
+        destination: `${aiApiProxyUrl}/ai/:path*`,
+      })
+      rewrites.push({
+        source: '/api/agent/:path*',
+        destination: `${aiApiProxyUrl}/agent/:path*`,
+      })
+    }
+
+    if (apiProxyUrl) {
+      rewrites.push({
+        source: '/api/:path*',
+        destination: `${apiProxyUrl}/:path*`,
+      })
+    }
 
     // 存在 NEXT_PUBLIC_PROXY_URL 则代理，本地直连用
     // 如：NEXT_PUBLIC_PROXY_URL = http://localhost:8080
-    if (process.env.NEXT_PUBLIC_PROXY_URL) {
-      rewrites.push({
-        source: `/api/:path*`,
-        destination: `${process.env.NEXT_PUBLIC_PROXY_URL}/api/:path*`,
-      })
-    }
     return rewrites
   },
 }

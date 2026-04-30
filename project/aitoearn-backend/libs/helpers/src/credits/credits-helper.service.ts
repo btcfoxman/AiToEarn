@@ -20,13 +20,11 @@ export class CreditsHelperService {
    * @param userId 用户ID
    * @returns Credits余额（美分）
    */
-  @Transactional()
   async getBalance(userId: string): Promise<number> {
     const user = await this.userRepository.getById(userId)
     if (!user) {
       throw new AppException(ResponseCode.UserNotFound)
     }
-    await this.checkUserCreditsExpiration(userId)
     return await this.creditsBalanceRepository.getBalance(userId)
   }
 

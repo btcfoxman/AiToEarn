@@ -26,6 +26,7 @@ const {
   ANTHROPIC_BASE_URL,
   ANTHROPIC_API_KEY,
   GROK_API_KEY,
+  GROK_BASE_URL,
   GEMINI_API_KEY,
   GEMINI_BASE_URL,
 } = process.env
@@ -109,7 +110,7 @@ module.exports = {
       apiKey: OPENAI_API_KEY,
     },
     grok: {
-      baseUrl: 'https://api.x.ai',
+      baseUrl: GROK_BASE_URL || 'https://api.x.ai',
       apiKey: GROK_API_KEY,
     },
     anthropic: {

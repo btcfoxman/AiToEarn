@@ -16,8 +16,12 @@ type RequestParamsWithSilent = RequestParams & {
   silent?: boolean // 是否静默处理错误，不显示提示
 }
 
+function withTrailingSlash(url: string) {
+  return url.endsWith('/') ? url : `${url}/`
+}
+
 const fetchService = new FetchService({
-  baseURL: `${process.env.NEXT_PUBLIC_API_URL}/`,
+  baseURL: withTrailingSlash(process.env.NEXT_PUBLIC_API_URL || '/api'),
   requestInterceptor(requestParams) {
     const token = useUserStore.getState().token
     requestParams.headers = {

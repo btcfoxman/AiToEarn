@@ -30,9 +30,16 @@ const {
 } = process.env
 
 const {
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
   MAIL_USER,
   MAIL_PASS,
+  MAIL_FROM,
 } = process.env
+
+const smtpPort = Number(SMTP_PORT || 587)
+const smtpSecure = ['1', 'true', 'yes', 'on'].includes(String(SMTP_SECURE || '').toLowerCase())
 
 const {
   BILIBILI_CLIENT_ID,
@@ -257,16 +264,16 @@ module.exports = {
   assets: JSON.parse(ASSETS_CONFIG),
   mail: {
     transport: {
-      host: 'email-smtp.ap-southeast-1.amazonaws.com',
-      port: 587,
-      secure: false,
+      host: SMTP_HOST || 'email-smtp.ap-southeast-1.amazonaws.com',
+      port: Number.isFinite(smtpPort) ? smtpPort : 587,
+      secure: smtpSecure,
       auth: {
         user: MAIL_USER,
         pass: MAIL_PASS,
       },
     },
     defaults: {
-      from: 'noreply@tx.aitoearn.ai',
+      from: MAIL_FROM || 'noreply@tx.aitoearn.ai',
     },
   },
   aliSms: {
