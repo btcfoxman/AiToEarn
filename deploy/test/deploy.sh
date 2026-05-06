@@ -16,11 +16,13 @@ if [ ! -d "${APP_DIR}" ]; then
 fi
 
 log "Syncing deployment files to ${APP_DIR}"
-mkdir -p "${APP_DIR}/scripts" "${APP_DIR}/logs" "${APP_DIR}/backups"
+mkdir -p "${APP_DIR}/config" "${APP_DIR}/scripts" "${APP_DIR}/logs" "${APP_DIR}/backups"
 cp -f "${SCRIPT_DIR}/docker-compose.yml" "${COMPOSE_FILE}"
 cp -f "${SCRIPT_DIR}/nginx.conf" "${APP_DIR}/nginx.conf"
 cp -f "${REPO_ROOT}/scripts/init.mjs" "${APP_DIR}/scripts/init.mjs"
 cp -f "${REPO_ROOT}/scripts/init-package.json" "${APP_DIR}/scripts/init-package.json"
+cp -f "${REPO_ROOT}/project/aitoearn-backend/apps/aitoearn-ai/config/config.js" "${APP_DIR}/config/aitoearn-ai.config.js"
+cp -f "${REPO_ROOT}/project/aitoearn-backend/apps/aitoearn-server/config/config.js" "${APP_DIR}/config/aitoearn-server.config.js"
 
 if [ ! -f "${APP_DIR}/.env" ]; then
   cp -f "${SCRIPT_DIR}/.env.example" "${APP_DIR}/.env"

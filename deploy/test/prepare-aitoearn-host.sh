@@ -57,7 +57,7 @@ if ! id -nG "${APP_USER}" | tr ' ' '\n' | grep -qx docker; then
 fi
 
 echo "[4/8] Creating deployment directories..."
-mkdir -p "${APP_DIR}/scripts" "${APP_DIR}/logs" "${APP_DIR}/backups"
+mkdir -p "${APP_DIR}/config" "${APP_DIR}/scripts" "${APP_DIR}/logs" "${APP_DIR}/backups"
 chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 
 echo "[5/8] Creating runner directory..."
