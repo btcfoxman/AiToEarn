@@ -146,8 +146,23 @@ jobs:
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Download repository archive
+        run: |
+          set -euo pipefail
+          work_dir="/tmp/aitoearn-actions-${GITHUB_RUN_ID}"
+          rm -rf "${work_dir}"
+          mkdir -p "${work_dir}"
+          curl -fsSL \
+            -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+            -o "${work_dir}/repo.tar.gz"
+          mkdir -p "${work_dir}/repo"
+          tar -xzf "${work_dir}/repo.tar.gz" --strip-components=1 -C "${work_dir}/repo"
+          echo "REPO_WORK_DIR=${work_dir}/repo" >> "${GITHUB_ENV}"
 
       - name: Deploy
-        run: bash deploy/test/deploy.sh
+        run: |
+          set -euo pipefail
+          cd "${REPO_WORK_DIR}"
+          bash deploy/test/deploy.sh
