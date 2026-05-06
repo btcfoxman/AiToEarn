@@ -18,7 +18,7 @@ export class AssetsModule {
   static forRoot(config: AssetsConfig): DynamicModule {
     const endpoint = config.endpoint
       || (config.provider === 'ali-oss' ? `https://${config.bucket}.${config.region}.aliyuncs.com` : '')
-    const cdnEndpoint = config.cdnEndpoint
+    const cdnEndpoint = config.publicEndpoint || config.cdnEndpoint
 
     FileUtil.init({ endpoint, cdnEndpoint })
 

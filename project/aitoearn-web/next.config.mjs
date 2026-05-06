@@ -53,9 +53,6 @@ const nextConfig = {
         destination: `${apiProxyUrl}/:path*`,
       })
     }
-
-    // 存在 NEXT_PUBLIC_PROXY_URL 则代理，本地直连用
-    // 如：NEXT_PUBLIC_PROXY_URL = http://localhost:8080
     return rewrites
   },
 }
