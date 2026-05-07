@@ -205,7 +205,7 @@
             "channel": "官方"
           },
           {
-            "model": "gpt-image-1",
+            "model": "gpt-image-2",
             "type": "图片生成",
             "duration": "",
             "resolution": "支持图片编辑",

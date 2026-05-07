@@ -205,7 +205,7 @@
             "channel": "Officiel"
           },
           {
-            "model": "gpt-image-1",
+            "model": "gpt-image-2",
             "type": "Génération d'image",
             "duration": "",
             "resolution": "Support édition d'image",

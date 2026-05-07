@@ -205,7 +205,7 @@
             "channel": "공식"
           },
           {
-            "model": "gpt-image-1",
+            "model": "gpt-image-2",
             "type": "이미지 생성",
             "duration": "",
             "resolution": "이미지 편집 지원",

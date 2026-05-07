@@ -104,6 +104,7 @@ export class GeminiVideoService {
       userType,
       model,
       duration,
+      resolution,
     })
 
     if (userType === UserType.User) {
@@ -191,6 +192,7 @@ export class GeminiVideoService {
 
     return {
       id: aiLog.id,
+      points: pricing,
       ...result.operation,
     }
   }

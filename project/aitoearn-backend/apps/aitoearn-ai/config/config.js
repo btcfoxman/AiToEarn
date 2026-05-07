@@ -58,6 +58,12 @@ function parseGeminiKeyPairs() {
   }
 }
 
+const VERTICAL_HORIZONTAL_ASPECT_RATIOS = ['16:9', '9:16']
+const VIDEO_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
+const ZERO_DURATION_PRICING = durations => durations.map(duration => ({ duration, price: 0 }))
+const ZERO_DURATION_RESOLUTION_PRICING = (durations, resolutions) =>
+  durations.flatMap(duration => resolutions.map(resolution => ({ duration, resolution, price: 0 })))
+
 module.exports = {
   port: 3010,
   logger: {
@@ -272,8 +278,8 @@ module.exports = {
       image: {
         generation: [
           {
-            name: 'gpt-image-1.5',
-            description: 'gpt-image-1.5',
+            name: 'gpt-image-2',
+            description: 'gpt-image-2',
             sizes: ['1024x1024', '1536x1024', '1024x1536', 'auto'],
             qualities: ['high', 'medium', 'low'],
             styles: [],
@@ -282,8 +288,8 @@ module.exports = {
         ],
         edit: [
           {
-            name: 'gpt-image-1.5',
-            description: 'gpt-image-1.5',
+            name: 'gpt-image-2',
+            description: 'gpt-image-2',
             sizes: ['1024x1024', '1536x1024', '1024x1536', 'auto'],
             qualities: ['high', 'medium', 'low'],
             styles: [],
@@ -295,43 +301,119 @@ module.exports = {
       video: {
         generation: [
           {
-            name: 'grok-imagine-video',
-            description: 'Grok Video',
+            name: 'sora-2',
+            description: 'OpenAI Sora 2',
+            channel: 'openai',
+            modes: ['text2video', 'image2video'],
+            resolutions: ['720p'],
+            durations: [10, 15],
+            maxInputImages: 1,
+            aspectRatios: VERTICAL_HORIZONTAL_ASPECT_RATIOS,
+            defaults: {
+              duration: 10,
+              resolution: '720p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([10, 15], ['720p']),
+          },
+          {
+            name: 'sora-2-pro',
+            description: 'OpenAI Sora 2 Pro',
+            channel: 'openai',
+            modes: ['text2video', 'image2video'],
+            resolutions: ['1024p'],
+            durations: [10, 15, 25],
+            maxInputImages: 1,
+            aspectRatios: VERTICAL_HORIZONTAL_ASPECT_RATIOS,
+            defaults: {
+              duration: 25,
+              resolution: '1024p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([10, 15, 25], ['1024p']),
+          },
+          {
+            name: 'grok-video-3',
+            description: 'Grok Video 3',
             channel: 'grok',
             modes: ['text2video', 'image2video', 'video2video'],
-            resolutions: ['720p'],
-            durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            resolutions: ['480p', '720p'],
+            durations: Array.from({ length: 15 }, (_, i) => i + 1),
             maxInputImages: 1,
-            aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
+            aspectRatios: VIDEO_ASPECT_RATIOS,
             defaults: {
               duration: 8,
+              resolution: '720p',
               aspectRatio: '9:16',
             },
             pricing: [
-              { duration: 1, price: 0 },
-              { duration: 2, price: 0 },
-              { duration: 3, price: 0 },
-              { duration: 4, price: 0 },
-              { duration: 5, price: 0 },
-              { duration: 6, price: 0 },
-              { duration: 7, price: 0 },
-              { duration: 8, price: 0 },
-              { duration: 9, price: 0 },
-              { duration: 10, price: 0 },
-              { duration: 11, price: 0 },
-              { duration: 12, price: 0 },
-              { duration: 13, price: 0 },
-              { duration: 14, price: 0 },
-              { duration: 15, price: 0 },
-              { mode: 'video2video', duration: 1, price: 0 },
-              { mode: 'video2video', duration: 2, price: 0 },
-              { mode: 'video2video', duration: 3, price: 0 },
-              { mode: 'video2video', duration: 4, price: 0 },
-              { mode: 'video2video', duration: 5, price: 0 },
-              { mode: 'video2video', duration: 6, price: 0 },
-              { mode: 'video2video', duration: 7, price: 0 },
-              { mode: 'video2video', duration: 8, price: 0 },
+              ...ZERO_DURATION_PRICING(Array.from({ length: 15 }, (_, i) => i + 1)),
+              ...ZERO_DURATION_PRICING([1, 2, 3, 4, 5, 6, 7, 8]).map(item => ({ ...item, mode: 'video2video' })),
             ],
+          },
+          {
+            name: 'doubao-seedance-2-0-fast-260128',
+            description: 'Doubao SeeDance 2.0 Fast',
+            channel: 'volcengine',
+            modes: ['text2video', 'image2video', 'flf2video'],
+            resolutions: ['480p', '720p', '1080p'],
+            durations: [5, 10],
+            maxInputImages: 2,
+            aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+            defaults: {
+              duration: 5,
+              resolution: '720p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([5, 10], ['480p', '720p', '1080p']),
+          },
+          {
+            name: 'veo3.1-components',
+            description: 'Google Veo 3.1 Components',
+            channel: 'gemini',
+            modes: ['text2video', 'image2video', 'flf2video', 'multi-image2video', 'video2video'],
+            resolutions: ['720p', '1080p', '4000'],
+            durations: [4, 6, 7, 8],
+            maxInputImages: 3,
+            aspectRatios: VERTICAL_HORIZONTAL_ASPECT_RATIOS,
+            defaults: {
+              duration: 8,
+              resolution: '720p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([4, 6, 7, 8], ['720p', '1080p', '4000']),
+          },
+          {
+            name: 'veo3.1-fast',
+            description: 'Google Veo 3.1 Fast',
+            channel: 'gemini',
+            modes: ['text2video', 'image2video', 'flf2video', 'video2video'],
+            resolutions: ['720p', '1080p', '4000'],
+            durations: [4, 6, 7, 8],
+            maxInputImages: 2,
+            aspectRatios: VERTICAL_HORIZONTAL_ASPECT_RATIOS,
+            defaults: {
+              duration: 8,
+              resolution: '720p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([4, 6, 7, 8], ['720p', '1080p', '4000']),
+          },
+          {
+            name: 'veo3.1-pro',
+            description: 'Google Veo 3.1 Pro',
+            channel: 'gemini',
+            modes: ['text2video', 'image2video', 'flf2video'],
+            resolutions: ['720p', '1080p', '4000'],
+            durations: [4, 6, 8],
+            maxInputImages: 2,
+            aspectRatios: VERTICAL_HORIZONTAL_ASPECT_RATIOS,
+            defaults: {
+              duration: 8,
+              resolution: '720p',
+              aspectRatio: '9:16',
+            },
+            pricing: ZERO_DURATION_RESOLUTION_PRICING([4, 6, 8], ['720p', '1080p', '4000']),
           },
         ],
       },

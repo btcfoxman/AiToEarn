@@ -21,7 +21,7 @@ const generateVideoSchema = z.object({
   prompt: z.string(),
   input_reference: z.string().optional(),
   model: z.enum(['sora-2', 'sora-2-pro']).default('sora-2'),
-  seconds: z.enum(['8', '10', '25']).optional(),
+  seconds: z.enum(['10', '15', '25']).optional(),
   size: z.enum(['720x1280', '1280x720', '1024x1792', '1792x1024']).optional(),
 })
 
@@ -50,7 +50,7 @@ const getVeoVideoStatusSchema = z.object({
 
 const generateVideoWithGrokSchema = z.object({
   prompt: z.string().describe('Video description prompt'),
-  model: z.string().default('grok-imagine-video').describe('Grok video model name'),
+  model: z.string().default('grok-video-3').describe('Grok video model name'),
   aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']).default('9:16').describe('Video aspect ratio'),
   resolution: z.enum(['480p', '720p']).default('720p').describe('Video resolution'),
   duration: z.number().int().min(1).max(15).optional().describe('Video duration in seconds'),
@@ -307,17 +307,16 @@ Example: "@character1 walks through a garden"`,
 Follow the generating-videos skill for prompt guidelines.
 
 **Models**:
-- veo-3.1-fast-generate-001 (default): Fast generation
-- veo-3.1-generate-001: Standard generation (higher quality)
-- veo-3.1-fast-generate-preview: Fast preview + video extension
-- veo-3.1-generate-preview: Preview + video extension + reference images
+- veo3.1-fast (default): Fast generation
+- veo3.1-pro: Higher quality generation
+- veo3.1-components: Components/reference-image generation
 
 **Generation Modes** (auto-detected):
 - Text-to-video: Only prompt
 - Image-to-video: prompt + image
 - First-last-frame: prompt + image + lastFrame
 - Video extension: prompt + video (preview models only, input & output 720p only, ~7s per extension, max 4 times)
-- Reference images: prompt + referenceImages (veo-3.1-generate-preview only, max 3)
+- Reference images: prompt + referenceImages (veo3.1-components only, max 3)
 
 **Video Extension Note**: Prefer using GCS URI (\`gs://bucket/path\`) over HTTP URL for the \`video\` parameter - it's more efficient (no download/base64 conversion needed).
 
@@ -382,11 +381,11 @@ Returns task ID for status tracking.`,
     return wrapTool(
       this.logger,
       MediaToolName.GenerateVideoWithGrok,
-      `Generate a video using Grok video model.
+      `Generate a video using Grok official video API.
 
 **IMPORTANT: Use the same language as the user's request for the video prompt.**
 
-**Model**: grok-imagine-video (default)
+**Model**: grok-video-3 (default)
 
 **Generation Modes**:
 - Text-to-video: Only prompt
@@ -394,7 +393,7 @@ Returns task ID for status tracking.`,
 
 **Parameters**:
 - prompt: Detailed video description
-- model: Model name (default: grok-imagine-video)
+- model: Model name (default: grok-video-3)
 - aspectRatio: "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3" (default: 9:16)
 - resolution: "480p", "720p" (default: 720p)
 - duration: Video duration in seconds (1-15, optional)
@@ -445,12 +444,12 @@ Returns task ID for status tracking.`,
       version: '1.0.0',
       tools: [
         this.createGenerateImageTool(userId, userType),
-        // this.createGenerateVideoTool(userId, userType),
-        // this.createGetVideoStatusTool(userId, userType),
+        this.createGenerateVideoTool(userId, userType),
+        this.createGetVideoStatusTool(userId, userType),
         // this.createSoraCharacterTool(userId, userType),
         // this.createGetSoraCharacterTool(userId, userType),
-        // this.createGenerateVideoWithVeoTool(userId, userType),
-        // this.createGetVeoVideoStatusTool(userId, userType),
+        this.createGenerateVideoWithVeoTool(userId, userType),
+        this.createGetVeoVideoStatusTool(userId, userType),
         this.createGenerateVideoWithGrokTool(userId, userType),
         this.createGetGrokVideoStatusTool(userId, userType),
       ],

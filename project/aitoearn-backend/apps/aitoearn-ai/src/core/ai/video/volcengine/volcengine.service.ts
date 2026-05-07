@@ -211,12 +211,18 @@ export class VolcengineVideoService {
     const content = request['content'] as Array<{ type: string, text?: string, image_url?: { url: string } }> | undefined
     let prompt = ''
     let image: string | undefined
+    let duration: number | undefined
+    let resolution: string | undefined
+    let aspectRatio: string | undefined
 
     if (content && Array.isArray(content)) {
       const textContent = content.find(c => c.type === ContentType.Text)
       if (textContent && textContent.text) {
         const parsed = parseModelTextCommand(textContent.text)
         prompt = parsed.prompt
+        duration = parsed.params.duration
+        resolution = parsed.params.resolution
+        aspectRatio = parsed.params.ratio
       }
       const imageContent = content.find(c => c.type === ContentType.ImageUrl)
       if (imageContent && imageContent.image_url) {
@@ -224,7 +230,7 @@ export class VolcengineVideoService {
       }
     }
 
-    return { prompt, image }
+    return { prompt, image, duration, resolution, aspectRatio }
   }
 
   async getTask(userId: string, userType: UserType, taskId: string) {

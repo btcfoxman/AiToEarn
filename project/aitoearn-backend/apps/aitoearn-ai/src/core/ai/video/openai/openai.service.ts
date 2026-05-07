@@ -89,9 +89,9 @@ export class OpenAIVideoService {
     const result = await this.openaiLibService.createVideo({
       prompt,
       input_reference: inputReferenceUploadable,
-      model: model as 'sora-2' | 'sora-2-pro',
+      model: model as any,
       // SDK 类型定义有误，实际支持 '10' | '15' | '25'
-      seconds: seconds as '4' | '8' | '12' | undefined,
+      seconds: seconds as any,
       size,
     })
 
@@ -302,6 +302,8 @@ export class OpenAIVideoService {
     return {
       prompt: (request['prompt'] as string) || '',
       image: request['input_reference'] as string | undefined,
+      duration: request['seconds'] ? Number(request['seconds']) : undefined,
+      resolution: request['size'] as string | undefined,
     }
   }
 

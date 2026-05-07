@@ -446,7 +446,7 @@ export class DraftGenerationService implements OnModuleDestroy {
 
     try {
       const candidateImageUrls = options?.imageUrls ?? []
-      const model = options?.model ?? 'grok-imagine-video'
+      const model = options?.model ?? 'grok-video-3'
       const duration = options?.duration
       const aspectRatio = options?.aspectRatio ?? '9:16'
 
@@ -703,7 +703,6 @@ Return the result as JSON.`
     const imageModels = config.ai.draftGeneration.imageModels
 
     const videoModels = config.ai.models.video.generation
-      .filter(v => v.channel === AiLogChannel.Grok)
 
     return { imageModels, videoModels }
   }

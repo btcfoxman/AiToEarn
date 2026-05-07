@@ -1,8 +1,7 @@
 export enum VeoModel {
-  Veo31Generate = 'veo-3.1-generate-001',
-  Veo31FastGenerate = 'veo-3.1-fast-generate-001',
-  Veo31GeneratePreview = 'veo-3.1-generate-preview',
-  Veo31FastGeneratePreview = 'veo-3.1-fast-generate-preview',
+  Veo31Components = 'veo3.1-components',
+  Veo31Fast = 'veo3.1-fast',
+  Veo31Pro = 'veo3.1-pro',
 }
 
 /**
@@ -14,7 +13,9 @@ export type GeminiImageSize = '0.5K' | '1K' | '2K' | '4K'
  * 图片生成宽高比选项
  */
 export type GeminiImageAspectRatio = '1:1' | '2:3' | '3:2' | '3:4' | '4:3' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9'
-export type GeminiImageModel = 'gemini-3.1-flash-image-preview' | 'gemini-3-pro-image-preview'
+export type GeminiImageModel
+  = | 'gemini-3.1-flash-image-preview'
+    | 'gemini-3-pro-image-preview'
 
 /**
  * 图片 token 明细（按模态）

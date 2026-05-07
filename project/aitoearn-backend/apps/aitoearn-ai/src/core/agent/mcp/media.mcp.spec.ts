@@ -2,19 +2,17 @@ import { Logger } from '@nestjs/common'
 import { UserType } from '@yikart/common'
 import { AiLogStatus } from '@yikart/mongodb'
 import { vi } from 'vitest'
-import { ChatService } from '../../ai/chat'
 import { ImageService } from '../../ai/image'
-import { GeminiVideoService, OpenAIVideoService, Sora2VideoService } from '../../ai/video'
+import { GeminiVideoService, GrokVideoService, OpenAIVideoService } from '../../ai/video'
 import { MediaMcp, MediaToolName } from './media.mcp'
 
 describe('mediaMcp', () => {
   let mediaMcp: MediaMcp
   let mockLogger: Logger
-  let mockChatService: vi.Mocked<ChatService>
   let mockOpenaiVideoService: vi.Mocked<OpenAIVideoService>
   let mockImageService: vi.Mocked<ImageService>
-  let mockSora2VideoService: vi.Mocked<Sora2VideoService>
   let mockGeminiVideoService: vi.Mocked<GeminiVideoService>
+  let mockGrokVideoService: vi.Mocked<GrokVideoService>
 
   const userId = 'test-user-id'
   const userType = UserType.User
@@ -25,8 +23,6 @@ describe('mediaMcp', () => {
       error: vi.fn(),
       fatal: vi.fn(),
     } as unknown as Logger
-
-    mockChatService = {} as vi.Mocked<ChatService>
 
     mockOpenaiVideoService = {
       createVideo: vi.fn(),
@@ -39,19 +35,21 @@ describe('mediaMcp', () => {
       userGeminiGeneration: vi.fn(),
     } as unknown as vi.Mocked<ImageService>
 
-    mockSora2VideoService = {} as vi.Mocked<Sora2VideoService>
-
     mockGeminiVideoService = {
       createVideo: vi.fn(),
       getVideo: vi.fn(),
     } as unknown as vi.Mocked<GeminiVideoService>
 
+    mockGrokVideoService = {
+      createVideo: vi.fn(),
+      getTask: vi.fn(),
+    } as unknown as vi.Mocked<GrokVideoService>
+
     mediaMcp = new MediaMcp(
-      mockChatService,
       mockOpenaiVideoService,
       mockImageService,
-      mockSora2VideoService,
       mockGeminiVideoService,
+      mockGrokVideoService,
     )
     // Override the logger for testing
     Object.defineProperty(mediaMcp, 'logger', { value: mockLogger })
@@ -498,7 +496,7 @@ describe('mediaMcp', () => {
       await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo-3.1-fast-generate-001',
+          model: 'veo3.1-fast',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -509,7 +507,7 @@ describe('mediaMcp', () => {
         userId,
         userType,
         prompt: 'A sunset over the ocean',
-        model: 'veo-3.1-fast-generate-001',
+        model: 'veo3.1-fast',
         aspectRatio: '16:9',
         duration: 8,
         resolution: '720p',
@@ -525,7 +523,7 @@ describe('mediaMcp', () => {
       const result = await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo-3.1-fast-generate-001',
+          model: 'veo3.1-fast',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -547,7 +545,7 @@ describe('mediaMcp', () => {
       const result = await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo-3.1-fast-generate-001',
+          model: 'veo3.1-fast',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -570,7 +568,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Success,
-        model: 'veo-3.1-fast-generate-001',
+        model: 'veo3.1-fast',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 60000),
         completedAt: new Date(),
@@ -594,7 +592,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Failed,
-        model: 'veo-3.1-fast-generate-001',
+        model: 'veo3.1-fast',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 60000),
         completedAt: null,
@@ -615,7 +613,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Generating,
-        model: 'veo-3.1-fast-generate-001',
+        model: 'veo3.1-fast',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 30000),
         completedAt: null,
@@ -644,6 +642,8 @@ describe('mediaMcp', () => {
       expect(toolNames).toContain(MediaToolName.GenerateImage)
       expect(toolNames).toContain(MediaToolName.GenerateVideoWithVeo)
       expect(toolNames).toContain(MediaToolName.GetVeoVideoStatus)
+      expect(toolNames).toContain(MediaToolName.GenerateVideoWithGrok)
+      expect(toolNames).toContain(MediaToolName.GetGrokVideoStatus)
     })
   })
 })

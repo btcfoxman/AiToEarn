@@ -79,7 +79,7 @@ export interface CreateVideoGenerationTaskRequest {
   content: Content[]
   /** 填写本次生成任务结果的回调通知地址。当视频生成任务有状态变化时，方舟将向此地址推送POST请求 */
   callback_url?: string
-  /** 是否返回生成视频的尾帧图像。仅doubao-seedance-1-0-lite-i2v支持该参数。默认值false */
+  /** 是否返回生成视频的尾帧图像。默认值false */
   return_last_frame?: boolean
 }
 
@@ -137,12 +137,7 @@ export type Ratio
 
 // 支持的模型
 export type VideoModel
-  = | 'doubao-seedance-pro'
-    | 'doubao-seedance-1-0-lite-t2v'
-    | 'doubao-seedance-1-0-lite-i2v'
-    | 'wan2-1-14b-t2v'
-    | 'wan2-1-14b-i2v'
-    | 'wan2-1-14b-flf2v'
+  = | 'doubao-seedance-2-0-fast-260128'
     | string
 
 // ========== 视频点播 (VOD) 相关接口 ==========

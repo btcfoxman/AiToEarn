@@ -164,7 +164,7 @@ AI: 🔧 **Loading Skills**
 📋 **Execution Plan**
 **Requirements**: 生成一个猫咪视频
 **Steps**: 1. 使用 Grok 生成 8 秒视频
-**Resources**: Model: grok-imagine-video, Duration: 8s, Aspect Ratio: 9:16
+**Resources**: Model: grok-video-3, Duration: 8s, Aspect Ratio: 9:16
 
 Starting execution...
 

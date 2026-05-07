@@ -48,7 +48,7 @@ The selected image sets the visual style for the entire video.
 
 ### Step 3: Generate Video with Voiceover
 Call \`generateVideoWithGrok\` with these MANDATORY parameters:
-- model: "grok-imagine-video" (DO NOT use any other model)
+- model: "grok-video-3" (DO NOT use any other model)
 - imageUrl: The selected image URL from Step 2 (single image)
 - duration: 8
 - aspectRatio: "9:16"

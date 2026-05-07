@@ -21,6 +21,7 @@ export interface VideoModelPricing {
   price: number
   resolution?: string
   aspectRatio?: string
+  mode?: string
   discount?: string
   originPrice?: number
 }

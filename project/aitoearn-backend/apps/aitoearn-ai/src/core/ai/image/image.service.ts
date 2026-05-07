@@ -105,7 +105,7 @@ export class ImageService {
       throw new BadRequestException('userId is required')
     }
 
-    if (params.model === 'gpt-image-1') {
+    if (params.model === 'gpt-image-2') {
       delete params.response_format
       delete params.style
     }
@@ -154,7 +154,7 @@ export class ImageService {
 
     const maskFile = mask ? await this.getUploadableByUrlOrDataUri(mask, 'mask') : undefined
 
-    if (params.model === 'gpt-image-1') {
+    if (params.model === 'gpt-image-2') {
       delete params.response_format
     }
     const imageResult = await this.openaiService.createImageEdit({

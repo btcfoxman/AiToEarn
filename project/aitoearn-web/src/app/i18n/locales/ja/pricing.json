@@ -205,7 +205,7 @@
             "channel": "公式"
           },
           {
-            "model": "gpt-image-1",
+            "model": "gpt-image-2",
             "type": "画像生成",
             "duration": "",
             "resolution": "画像編集対応",

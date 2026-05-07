@@ -107,7 +107,7 @@ export class DraftGenerationController {
    */
   @ApiDoc({
     summary: '生成品牌内容草稿 (V2)',
-    description: '使用固定管线直接调用 AI 服务生成 TikTok 视频内容草稿。前端直接传入 model（如 grok-imagine-video）、duration、aspectRatio。返回 taskIds 可用于查询进度。',
+    description: '使用固定管线直接调用 AI 服务生成 TikTok 视频内容草稿。前端直接传入 model（如 grok-video-3）、duration、aspectRatio。返回 taskIds 可用于查询进度。',
     body: CreateDraftGenerationV2DtoSchema,
     response: CreateDraftGenerationVo,
   })

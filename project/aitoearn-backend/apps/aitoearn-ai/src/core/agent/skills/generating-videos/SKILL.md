@@ -13,7 +13,7 @@ Generates videos using **Grok** (preferred) and **Google Veo 3.1** models.
 
 | Scenario | Use Model | Reason |
 |----------|-----------|--------|
-| Video ≤ 15s (text-to-video / image-to-video) | **Grok** (preferred) | Grok supports 1-15s directly, faster and cost-effective |
+| Video ≤ 15s (text-to-video / image-to-video) | **Grok** (preferred) | Grok supports 1-15s directly through the official API, faster and cost-effective |
 | Video 16-36s (continuous) | **Veo** | Requires Video Extension, Grok max is 15s |
 | First-last-frame storyboard | **Veo** | Grok does not support first-last-frame |
 | Reference images (style consistency) | **Veo** (generate-preview) | Grok does not support reference images |
@@ -33,7 +33,7 @@ Generates videos using **Grok** (preferred) and **Google Veo 3.1** models.
 
 | Model | Speed | Quality | Max Duration | Use Case |
 |-------|-------|---------|--------------|----------|
-| grok-imagine-video | Fast | Good | 15s | Default - Most use cases |
+| grok-video-3 | Fast | Good | 15s | Default - Most use cases |
 
 ### Grok Parameters
 
@@ -65,14 +65,13 @@ Use Veo when you need: video extension, first-last-frame, or reference images.
 
 | Model                         | Speed | Quality | Video Extension | Reference Images | Use Case                         |
 | ----------------------------- | ----- | ------- | --------------- | ---------------- | -------------------------------- |
-| veo-3.1-fast-generate-preview | Fast  | Good    | Yes             | No               | Default Veo - Most use cases     |
-| veo-3.1-generate-preview      | Slow  | Better  | Yes             | Yes (max 3)      | Best quality + all features      |
-| veo-3.1-fast-generate-001     | Fast  | Good    | No              | No               | Simple generation (no extension) |
-| veo-3.1-generate-001          | Slow  | Better  | No              | No               | Higher quality (no extension)    |
+| veo3.1-fast       | Fast | Good   | Yes | No          | Default Veo - most use cases |
+| veo3.1-components | Slow | Better | Yes | Yes (max 3) | Reference/component workflows |
+| veo3.1-pro        | Slow | Better | No  | No          | Higher quality generation    |
 
 **Veo Model Selection**:
 
-- **Default Veo**: Use `veo-3.1-fast-generate-preview` (supports video extension)
+- **Default Veo**: Use `veo3.1-fast` (supports video extension)
 - **Use non-preview models when**: User explicitly requests and doesn't need video extension
 - **Use non-fast models when**: User explicitly requests higher quality
 
@@ -213,7 +212,7 @@ Modes are auto-detected based on parameters:
 | Image-to-video   | prompt + image             | All                           |
 | First-last-frame | prompt + image + lastFrame | All                           |
 | Video extension  | prompt + video             | Preview models only           |
-| Reference images | prompt + referenceImages   | veo-3.1-generate-preview only |
+| Reference images | prompt + referenceImages   | veo3.1-components only |
 
 ---
 
@@ -225,7 +224,7 @@ Extend existing Veo-generated videos.
 
 ### Limitations
 
-- **Models**: Only preview models (`veo-3.1-generate-preview`, `veo-3.1-fast-generate-preview`)
+- **Models**: `veo3.1-components` and `veo3.1-fast`
 - **Extension length**: ~7 seconds per extension
 - **Max extensions**: 4 times
 - **Max total duration**: 36 seconds (8s initial + 4×7s extensions)
@@ -240,7 +239,7 @@ Extend existing Veo-generated videos.
 
 **Note**: When extending videos, prefer using GCS URI over HTTP URL for better performance (no download/base64 conversion needed).
 
-- **Models**: Only preview models (`veo-3.1-generate-preview`, `veo-3.1-fast-generate-preview`)
+- **Models**: `veo3.1-components` and `veo3.1-fast`
 - **Extension length**: ~7 seconds per extension
 - **Max extensions**: five times
 - **Max total duration**: 37 seconds
@@ -286,7 +285,7 @@ Extend existing Veo-generated videos.
 - **Faster**: Grok generates directly without extension polling
 - **Cost-effective**: Single generation call vs initial + extensions
 - **Simpler workflow**: No multi-step extension process needed
-- **Full duration support**: Grok supports 1-15 seconds natively
+- **Full duration support**: Grok supports 1-15 seconds natively through the official API
 
 ### Veo Extension (for 16-36s only)
 

@@ -5,7 +5,7 @@ description: Generates images using AI models (Gemini). AI图像生成、文生�
 
 # Image Generation
 
-Generates images using Gemini AI model (default: gemini-3.1-flash-image-preview, compatible: gemini-3-pro-image-preview).
+Generates images using Gemini-compatible image models (default: gemini-3.1-flash-image-preview; also supports gemini-3-pro-image-preview).
 
 ## Parameters
 

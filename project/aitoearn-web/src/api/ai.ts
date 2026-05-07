@@ -61,6 +61,7 @@ export function generateVideo(data: {
   prompt: string
   image?: any
   image_tail?: string
+  video_url?: string
   size?: string
   duration?: number
   metadata?: Record<string, any>

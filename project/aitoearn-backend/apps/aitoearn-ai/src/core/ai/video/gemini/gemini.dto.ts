@@ -12,10 +12,9 @@ const geminiVeoVideoCreateBaseSchema = z.object({
 
 const geminiVeoTIToVideoSchema = z.object({
   model: z.enum([
-    'veo-3.1-generate-001',
-    'veo-3.1-fast-generate-001',
-    'veo-3.1-generate-preview',
-    'veo-3.1-fast-generate-preview',
+    'veo3.1-components',
+    'veo3.1-fast',
+    'veo3.1-pro',
   ]).describe('Veo 模型名称'),
   ...geminiVeoVideoCreateBaseSchema.shape,
   aspectRatio: z.enum(['16:9', '9:16']).default('9:16').describe('视频比例，默认竖屏'),
@@ -25,7 +24,7 @@ const geminiVeoTIToVideoSchema = z.object({
 
 const geminiVeoRefToVideoSchema = z.object({
   model: z.enum([
-    'veo-3.1-generate-preview',
+    'veo3.1-components',
   ]).describe('Veo 模型名称'),
   ...geminiVeoVideoCreateBaseSchema.shape,
   duration: z.literal(8).describe('视频时长 (秒)'),
@@ -35,8 +34,8 @@ const geminiVeoRefToVideoSchema = z.object({
 
 const geminiVeoExtendVideoSchema = z.object({
   model: z.enum([
-    'veo-3.1-generate-preview',
-    'veo-3.1-fast-generate-preview',
+    'veo3.1-components',
+    'veo3.1-fast',
   ]).describe('Veo 模型名称'),
   ...geminiVeoVideoCreateBaseSchema.shape,
   duration: z.literal(7).describe('视频时长 (秒)'),
