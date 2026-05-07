@@ -1052,11 +1052,96 @@ Return the result as JSON.`
     aspectRatio?: string,
     imageSize?: string,
   ): Promise<{ urls: string[], points: number }> {
+    if (imageModel === 'gpt-image-2') {
+      return this.generateImagesWithGptImage(userId, userType, imageModel, imagePrompts, referenceImageUrls, aspectRatio, imageSize)
+    }
     return this.generateImagesWithGemini(userId, userType, imageModel, imagePrompts, referenceImageUrls, aspectRatio, imageSize)
   }
 
+  private resolveGptImageSize(imageSize?: string, aspectRatio?: string): '1024x1024' | '1536x1024' | '1024x1536' | 'auto' {
+    const supportedSizes = ['1024x1024', '1536x1024', '1024x1536', 'auto'] as const
+    if (imageSize && supportedSizes.includes(imageSize as (typeof supportedSizes)[number])) {
+      return imageSize as (typeof supportedSizes)[number]
+    }
+
+    if (aspectRatio === '16:9' || aspectRatio === '3:2' || aspectRatio === '4:3') {
+      return '1536x1024'
+    }
+    if (aspectRatio === '9:16' || aspectRatio === '2:3' || aspectRatio === '3:4' || aspectRatio === '4:5') {
+      return '1024x1536'
+    }
+    return '1024x1024'
+  }
+
   /**
-   * 使用 Gemini 模型（nb2/nb-pro）批量生成图片
+   * Use OpenAI image models for image-text drafts. When reference images exist,
+   * use image edit so the selected brand/material images still influence output.
+   */
+  private async generateImagesWithGptImage(
+    userId: string,
+    userType: UserType,
+    model: string,
+    imagePrompts: string[],
+    referenceImageUrls: string[],
+    aspectRatio?: string,
+    imageSize?: string,
+  ): Promise<{ urls: string[], points: number }> {
+    const urls: string[] = []
+    let totalPoints = 0
+    const size = this.resolveGptImageSize(imageSize, aspectRatio)
+    const modelConfig = config.ai.models.image.generation.find(m => m.name === model)
+    const editModelConfig = config.ai.models.image.edit.find(m => m.name === model)
+
+    for (const [index, prompt] of imagePrompts.entries()) {
+      this.logger.log(
+        { model, promptIndex: index, promptLength: prompt.length, aspectRatio, imageSize, size },
+        'ImageText: Generating image with GPT Image',
+      )
+
+      const result = await retry(
+        () => referenceImageUrls.length > 0
+          ? this.imageService.userEdit({
+              userId,
+              userType,
+              model,
+              prompt,
+              image: referenceImageUrls,
+              n: 1,
+              size,
+            })
+          : this.imageService.userGeneration({
+              userId,
+              userType,
+              model,
+              prompt,
+              n: 1,
+              size,
+            }),
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          onRetry: (error, attempt) => {
+            this.logger.warn(
+              { promptIndex: index, attempt, error: error.message },
+              'ImageText: GPT image generation failed, retrying',
+            )
+          },
+        },
+      )
+
+      for (const image of result.list || []) {
+        if (image.url) {
+          urls.push(image.url)
+        }
+      }
+      totalPoints += Number((referenceImageUrls.length > 0 ? editModelConfig : modelConfig)?.pricing ?? 0)
+    }
+
+    return { urls, points: totalPoints }
+  }
+
+  /**
+   * 使用 Gemini 模型批量生成图片
    * 注意：userGeminiGeneration 内部已自动扣费和记录 AiLog
    */
   private async generateImagesWithGemini(

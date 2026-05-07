@@ -607,7 +607,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className }: AiBatchGen
     setContentType('video')
     // 图文模型：优先用 API 返回的第一个有效值，回退到默认值
     const firstImageModel = pricingData?.imageModels?.[0]
-    setImageModel(firstImageModel?.model ?? 'nb2')
+    setImageModel(firstImageModel?.model ?? 'gemini-3.1-flash-image-preview')
     setImageCount(3)
     setImageSize(firstImageModel?.pricing?.[0]?.resolution ?? '1K')
     setQuantity(1)

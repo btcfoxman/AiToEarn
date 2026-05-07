@@ -122,7 +122,7 @@ export class DraftGenerationController {
 
   @ApiDoc({
     summary: '生成图文内容草稿',
-    description: '使用 AI 生成图文内容草稿。支持选择图片模型：nb2（Nano Banana 2）或 nb-pro（Nano Banana Pro）。返回 taskIds 可用于查询进度。',
+    description: '使用 AI 生成图文内容草稿。支持选择图片模型：Nano Banana 2、Nano Banana Pro 或 GPT-Image-2。返回 taskIds 可用于查询进度。',
     body: CreateImageTextDraftDtoSchema,
     response: CreateDraftGenerationVo,
   })

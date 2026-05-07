@@ -442,6 +442,15 @@ module.exports = {
             { resolution: '4K', pricePerImage: 0 },
           ],
         },
+        {
+          model: 'gpt-image-2',
+          displayName: 'GPT-Image-2',
+          supportedAspectRatios: ['1:1', '16:9', '9:16'],
+          maxInputImages: 16,
+          pricing: [
+            { resolution: '1K', pricePerImage: 0 },
+          ],
+        },
       ],
     },
   },

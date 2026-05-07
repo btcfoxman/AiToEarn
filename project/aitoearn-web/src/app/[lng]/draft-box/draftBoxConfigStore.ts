@@ -47,7 +47,7 @@ const DEFAULT_CONFIG: DraftBoxConfig = {
   quantity: 1,
   modelType: '' as VideoModelType,
   contentType: 'video',
-  imageModel: 'nb2',
+  imageModel: 'gemini-3.1-flash-image-preview',
   imageCount: 3,
   imageSize: '1K',
   selectedPlatforms: [],
