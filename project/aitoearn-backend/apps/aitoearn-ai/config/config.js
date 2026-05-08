@@ -65,6 +65,7 @@ const VIDEO_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
 const ZERO_DURATION_PRICING = durations => durations.map(duration => ({ duration, price: 0 }))
 const ZERO_DURATION_RESOLUTION_PRICING = (durations, resolutions) =>
   durations.flatMap(duration => resolutions.map(resolution => ({ duration, resolution, price: 0 })))
+const SEEDANCE_DURATIONS = Array.from({ length: 12 }, (_, i) => i + 4)
 
 module.exports = {
   port: 3010,
@@ -366,15 +367,15 @@ module.exports = {
             channel: 'volcengine',
             modes: ['text2video', 'image2video', 'flf2video'],
             resolutions: ['480p', '720p', '1080p'],
-            durations: [5, 10],
+            durations: SEEDANCE_DURATIONS,
             maxInputImages: 2,
             aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
             defaults: {
-              duration: 5,
+              duration: 6,
               resolution: '720p',
               aspectRatio: '9:16',
             },
-            pricing: ZERO_DURATION_RESOLUTION_PRICING([5, 10], ['480p', '720p', '1080p']),
+            pricing: ZERO_DURATION_RESOLUTION_PRICING(SEEDANCE_DURATIONS, ['480p', '720p', '1080p']),
           },
           {
             name: 'veo3.1-components',

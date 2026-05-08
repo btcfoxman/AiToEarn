@@ -453,8 +453,8 @@ export class DraftGenerationService implements OnModuleDestroy {
       // 仅 draft 类型需要 Gemini 规划（生成标题/描述/话题）
       let plan: V2PlanResult | undefined
       if (draftType === 'draft') {
-        const { plan: geminiPlan, points: planPoints } = await this.planWithGemini(userId, userType, candidateImageUrls, options?.prompt)
-        plan = geminiPlan
+        const { plan: metadataPlan, points: planPoints } = await this.planDraftMetadata(userId, userType, candidateImageUrls, options?.prompt)
+        plan = metadataPlan
         consumedPoints += planPoints
       }
 
@@ -564,6 +564,93 @@ export class DraftGenerationService implements OnModuleDestroy {
   /**
    * V2 辅助方法：调用 Gemini Flash 一次性完成选图 + 视频 prompt + 元数据生成
    */
+  private async planDraftMetadata(
+    userId: string,
+    userType: UserType,
+    imageUrls: string[],
+    userPrompt?: string,
+  ): Promise<{ plan: V2PlanResult, points: number }> {
+    if (!config.ai.gemini.apiKey) {
+      this.logger.warn('Gemini API key is not configured; using local draft metadata fallback')
+      return { plan: this.buildFallbackMetadataPlan(userPrompt), points: 0 }
+    }
+
+    try {
+      return await this.planWithGemini(userId, userType, imageUrls, userPrompt)
+    }
+    catch (error) {
+      this.logger.warn({ error }, 'Gemini planning failed; using local draft metadata fallback')
+      return { plan: this.buildFallbackMetadataPlan(userPrompt), points: 0 }
+    }
+  }
+
+  private buildFallbackMetadataPlan(userPrompt?: string): V2PlanResult {
+    const rawPrompt = (userPrompt || '').trim()
+    const contentPrompt = this.extractContentPrompt(rawPrompt)
+    const titleLimit = this.extractPromptLimit(rawPrompt, ['title', '标题'], 30)
+    const descriptionLimit = this.extractPromptLimit(rawPrompt, ['description', 'desc', '描述'], 280)
+    const topicLimit = Math.min(this.extractPromptLimit(rawPrompt, ['topic', 'hashtag', '话题'], 4), 5)
+
+    const titleSource = contentPrompt.split(/[.!?。！？\n]/)[0]?.trim() || contentPrompt || 'AI Video'
+    const descriptionSource = contentPrompt || rawPrompt || 'AI generated video'
+
+    return {
+      title: this.truncateText(titleSource, titleLimit),
+      description: this.truncateText(descriptionSource, descriptionLimit),
+      topics: this.extractFallbackTopics(rawPrompt, topicLimit),
+    }
+  }
+
+  private extractContentPrompt(prompt: string) {
+    return prompt
+      .replace(/^自定义提示词[:：]\s*/u, '')
+      .replace(/\s*重要[:：].*$/su, '')
+      .replace(/\s*(?:标题|title).{0,8}(?:字数|长度)?限制[:：]?\s*\d+.*$/isu, '')
+      .trim()
+  }
+
+  private extractPromptLimit(prompt: string, labels: string[], defaultValue: number) {
+    for (const label of labels) {
+      const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const match = prompt.match(new RegExp(`${escapedLabel}.{0,8}(?:字数|长度|数量)?限制[:：]?\\s*(\\d+)`, 'iu'))
+      if (match?.[1]) {
+        return Number.parseInt(match[1], 10)
+      }
+    }
+    return defaultValue
+  }
+
+  private truncateText(text: string, maxLength: number) {
+    if (text.length <= maxLength) {
+      return text
+    }
+    return text.slice(0, Math.max(1, maxLength)).trim()
+  }
+
+  private extractFallbackTopics(prompt: string, limit: number) {
+    const topics = new Set<string>()
+
+    const hashtagMatches = prompt.matchAll(/[#＃]([A-Za-z0-9_\-\u4E00-\u9FA5]+)/gu)
+    for (const match of hashtagMatches) {
+      if (match[1]) {
+        topics.add(match[1])
+      }
+    }
+
+    if (/seedance/i.test(prompt)) {
+      topics.add('Seedance')
+    }
+    if (/api/i.test(prompt)) {
+      topics.add('API')
+    }
+    if (/华强/u.test(prompt)) {
+      topics.add('华强')
+    }
+    topics.add('AI视频')
+
+    return Array.from(topics).slice(0, limit)
+  }
+
   private async planWithGemini(
     userId: string,
     userType: UserType,
