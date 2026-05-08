@@ -14,6 +14,7 @@ log() {
 read_env_value() {
   local key="$1"
   local file="$2"
+  [ -r "${file}" ] || return 0
   awk -F= -v key="${key}" '$1 == key { print substr($0, length(key) + 2) }' "${file}" | tail -n1 | tr -d '"\r'
 }
 
@@ -29,7 +30,7 @@ ensure_rustfs_bucket() {
     return 0
   fi
 
-  if [ -f "${rustfs_env}" ]; then
+  if [ -r "${rustfs_env}" ]; then
     access_key="$(read_env_value RUSTFS_ACCESS_KEY "${rustfs_env}")"
     secret_key="$(read_env_value RUSTFS_SECRET_KEY "${rustfs_env}")"
   fi

@@ -39,6 +39,7 @@ prepare_centos7_runner_runtime() {
 read_env_value() {
   local key="$1"
   local file="$2"
+  [ -r "${file}" ] || return 0
   awk -F= -v key="${key}" '$1 == key { print substr($0, length(key) + 2) }' "${file}" | tail -n1 | tr -d '"\r'
 }
 
