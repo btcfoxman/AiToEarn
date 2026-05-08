@@ -65,21 +65,7 @@ export class VolcengineVideoService {
   }
 
   private shouldUseOpenAICompatibleRequest() {
-    const requestMode = config.ai.volcengine.videoRequestMode
-    if (requestMode === 'openai-compatible') {
-      return true
-    }
-    if (requestMode === 'official') {
-      return false
-    }
-
-    try {
-      const hostname = new URL(config.ai.volcengine.baseUrl).hostname
-      return !hostname.endsWith('volces.com')
-    }
-    catch {
-      return false
-    }
+    return config.ai.volcengine.videoRequestMode === 'openai-compatible'
   }
 
   private resolveOpenAICompatibleMode(content: Content[]) {
