@@ -18,6 +18,8 @@ const {
 
 const {
   VOLCENGINE_API_KEY,
+  VOLCENGINE_BASE_URL,
+  VOLCENGINE_VIDEO_REQUEST_MODE,
   VOLCENGINE_ACCESS_KEY_ID,
   VOLCENGINE_SECRET_ACCESS_KEY,
   VOLCENGINE_VOD_SPACE_NAME,
@@ -103,7 +105,8 @@ module.exports = {
   assets: JSON.parse(ASSETS_CONFIG),
   ai: {
     volcengine: {
-      baseUrl: 'https://ark.cn-beijing.volces.com/',
+      baseUrl: VOLCENGINE_BASE_URL || 'https://ark.cn-beijing.volces.com/',
+      videoRequestMode: VOLCENGINE_VIDEO_REQUEST_MODE || 'auto',
       apiKey: VOLCENGINE_API_KEY,
       accessKeyId: VOLCENGINE_ACCESS_KEY_ID,
       secretAccessKey: VOLCENGINE_SECRET_ACCESS_KEY,
@@ -353,7 +356,13 @@ module.exports = {
           },
           {
             name: 'doubao-seedance-2-0-fast-260128',
-            description: 'Doubao SeeDance 2.0 Fast',
+            description: 'Seedance 2.0 Fast',
+            summary: 'Doubao Seedance 2.0 Fast on Volcengine Ark',
+            mainTag: 'Seedance',
+            tags: [
+              { 'en-US': 'Seedance', 'zh-CN': 'Seedance' },
+              { 'en-US': 'Volcengine', 'zh-CN': '火山方舟' },
+            ],
             channel: 'volcengine',
             modes: ['text2video', 'image2video', 'flf2video'],
             resolutions: ['480p', '720p', '1080p'],

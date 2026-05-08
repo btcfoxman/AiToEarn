@@ -4,6 +4,7 @@ import { z } from 'zod'
 export const volcengineConfigSchema = z.object({
   apiKey: z.string().describe('Volcengine API Key'),
   baseUrl: z.string().default('https://ark.cn-beijing.volces.com').describe('Volcengine Base URL'),
+  videoRequestMode: z.enum(['auto', 'official', 'openai-compatible']).default('auto').describe('Volcengine video request payload mode'),
   accessKeyId: z.string().describe('Volcengine VOD AccessKey ID'),
   secretAccessKey: z.string().describe('Volcengine VOD Secret Access Key'),
   spaceName: z.string().describe('Volcengine VOD Space Name'),

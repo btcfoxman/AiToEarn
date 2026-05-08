@@ -5,10 +5,12 @@ import { CreditsHelperService } from '@yikart/helpers'
 import { AiLogChannel, AiLogRepository, AiLogStatus, AiLogType, AssetType } from '@yikart/mongodb'
 import { TaskStatus } from '../../../../common'
 import { config } from '../../../../config'
+import type { Content, CreateVideoGenerationTaskRequest } from '../../libs/volcengine'
 import {
   ContentType,
   CreateVideoGenerationTaskResponse,
   GetVideoGenerationTaskResponse,
+  ImageRole,
   parseModelTextCommand,
   VolcengineService as VolcengineLibService,
   TaskStatus as VolcTaskStatus,
@@ -62,6 +64,87 @@ export class VolcengineVideoService {
     return pricingConfig.price
   }
 
+  private shouldUseOpenAICompatibleRequest() {
+    const requestMode = config.ai.volcengine.videoRequestMode
+    if (requestMode === 'openai-compatible') {
+      return true
+    }
+    if (requestMode === 'official') {
+      return false
+    }
+
+    try {
+      const hostname = new URL(config.ai.volcengine.baseUrl).hostname
+      return !hostname.endsWith('volces.com')
+    }
+    catch {
+      return false
+    }
+  }
+
+  private resolveOpenAICompatibleMode(content: Content[]) {
+    const imageContents = content.filter(
+      (item): item is Extract<Content, { type: ContentType.ImageUrl }> => item.type === ContentType.ImageUrl,
+    )
+    if (imageContents.some(image => image.role === ImageRole.LastFrame) || imageContents.length >= 2) {
+      return 'i2v_first_last'
+    }
+    if (imageContents.length === 1) {
+      return 'i2v'
+    }
+    return 't2v'
+  }
+
+  private buildOpenAICompatibleRequestParams(
+    content: Content[],
+    prompt: string,
+    modelParams: ReturnType<typeof parseModelTextCommand>['params'],
+  ): Partial<CreateVideoGenerationTaskRequest> {
+    const mode = this.resolveOpenAICompatibleMode(content)
+    const request: Partial<CreateVideoGenerationTaskRequest> = {
+      prompt,
+      mode,
+      function_mode: mode,
+    }
+
+    if (modelParams.duration !== undefined) {
+      request.duration = modelParams.duration
+      request.seconds = modelParams.duration
+    }
+    if (modelParams.ratio !== undefined) {
+      request.ratio = modelParams.ratio
+      request.aspect_ratio = modelParams.ratio
+    }
+    if (modelParams.resolution !== undefined) {
+      request.resolution = modelParams.resolution
+    }
+    if (modelParams.framespersecond !== undefined) {
+      request.fps = modelParams.framespersecond
+    }
+    if (modelParams.watermark !== undefined) {
+      request.watermark = modelParams.watermark
+    }
+    if (modelParams.seed !== undefined) {
+      request.seed = modelParams.seed
+    }
+
+    const imageUrls = content
+      .filter((item): item is Extract<Content, { type: ContentType.ImageUrl }> => item.type === ContentType.ImageUrl)
+      .map(item => item.image_url.url)
+
+    if (imageUrls.length > 0) {
+      request.image_url = imageUrls[0]
+      request.input_reference = imageUrls[0]
+      request.image_urls = imageUrls
+    }
+    if (imageUrls.length > 1) {
+      request.last_image_url = imageUrls[1]
+      request.end_image_url = imageUrls[1]
+    }
+
+    return request
+  }
+
   /**
    * Volcengine视频生成
    */
@@ -75,7 +158,7 @@ export class VolcengineVideoService {
       throw new BadRequestException('prompt is required')
     }
 
-    const { params: modelParams } = parseModelTextCommand(prompt)
+    const { prompt: cleanPrompt, params: modelParams } = parseModelTextCommand(prompt)
 
     const pricing = await this.calculatePrice({
       userId,
@@ -93,13 +176,19 @@ export class VolcengineVideoService {
       }
     }
 
-    const startedAt = new Date()
-    const result = await this.volcengineLibService.createVideoGenerationTask({
+    const createRequest: CreateVideoGenerationTaskRequest = {
       ...params,
       model,
       content,
       callback_url: config.ai.volcengine.callbackUrl,
-    })
+    }
+
+    if (this.shouldUseOpenAICompatibleRequest()) {
+      Object.assign(createRequest, this.buildOpenAICompatibleRequestParams(content, cleanPrompt, modelParams))
+    }
+
+    const startedAt = new Date()
+    const result = await this.volcengineLibService.createVideoGenerationTask(createRequest)
 
     if (userType === UserType.User) {
       await this.creditsHelper.deductCredits({

@@ -75,8 +75,42 @@ export interface Usage {
 export interface CreateVideoGenerationTaskRequest {
   /** 您需要调用的模型的ID（Model ID）或Endpoint ID */
   model: string
+  /** OpenAI-compatible gateways require a top-level prompt field. Official Ark can keep using content text. */
+  prompt?: string
   /** 输入给模型，生成视频的信息，支持文本信息和图片信息 */
   content: Content[]
+  /** Compatibility mode, such as t2v, i2v, i2v_first_last, reference_images, or reference_material. */
+  mode?: string
+  /** Alias for mode used by some OpenAI-compatible gateways. */
+  function_mode?: string
+  /** First image URL alias used by OpenAI-compatible gateways. */
+  image_url?: string
+  /** Image URL list alias used by OpenAI-compatible gateways. */
+  image_urls?: string[]
+  /** First frame/reference image alias used by OpenAI-compatible gateways. */
+  input_reference?: string
+  /** Last frame image alias used by OpenAI-compatible gateways. */
+  end_image_url?: string
+  /** Last frame image alias used by OpenAI-compatible gateways. */
+  last_image_url?: string
+  /** Output aspect ratio, such as 16:9 or 9:16. */
+  ratio?: Ratio
+  /** Alias for ratio used by OpenAI-compatible gateways. */
+  aspect_ratio?: Ratio
+  /** Video duration in seconds. */
+  duration?: number
+  /** Alias for duration used by OpenAI-compatible gateways. */
+  seconds?: number
+  /** Output resolution such as 720p or 1080p. */
+  resolution?: Resolution
+  /** Frame rate. */
+  fps?: number
+  /** Random seed used by supported gateways. */
+  seed?: number
+  /** Whether to generate audio. */
+  generate_audio?: boolean
+  /** Whether to add a watermark. */
+  watermark?: boolean
   /** 填写本次生成任务结果的回调通知地址。当视频生成任务有状态变化时，方舟将向此地址推送POST请求 */
   callback_url?: string
   /** 是否返回生成视频的尾帧图像。默认值false */
