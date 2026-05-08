@@ -36,6 +36,12 @@ prepare_centos7_runner_runtime() {
   fi
 }
 
+read_env_value() {
+  local key="$1"
+  local file="$2"
+  awk -F= -v key="${key}" '$1 == key { print substr($0, length(key) + 2) }' "${file}" | tail -n1 | tr -d '"\r'
+}
+
 echo "[1/8] Checking required commands..."
 command -v docker >/dev/null
 command -v curl >/dev/null
@@ -99,14 +105,19 @@ for endpoint in "192.168.3.6/27017" "192.168.3.6/6379" "192.168.3.6/9000"; do
 done
 
 echo "[9/9] Ensuring RustFS bucket..."
+rustfs_bucket="${RUSTFS_BUCKET:-}"
+if [ -z "${rustfs_bucket}" ] && [ -f "${APP_DIR}/.env" ]; then
+  rustfs_bucket="$(read_env_value RUSTFS_BUCKET "${APP_DIR}/.env")"
+fi
+rustfs_bucket="${rustfs_bucket:-aitoearn-test}"
 if [ -f /home/btcfoxman/docker/rustfs/.env ]; then
-  rustfs_access_key="$(awk -F= '$1=="RUSTFS_ACCESS_KEY"{print $2}' /home/btcfoxman/docker/rustfs/.env)"
-  rustfs_secret_key="$(awk -F= '$1=="RUSTFS_SECRET_KEY"{print $2}' /home/btcfoxman/docker/rustfs/.env)"
+  rustfs_access_key="$(read_env_value RUSTFS_ACCESS_KEY /home/btcfoxman/docker/rustfs/.env)"
+  rustfs_secret_key="$(read_env_value RUSTFS_SECRET_KEY /home/btcfoxman/docker/rustfs/.env)"
   if [ -n "${rustfs_access_key}" ] && [ -n "${rustfs_secret_key}" ]; then
-    if docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c "mc alias set rustfs http://192.168.3.6:9000 \"${rustfs_access_key}\" \"${rustfs_secret_key}\" >/dev/null && mc mb rustfs/aitoearn-test --ignore-existing >/dev/null && mc anonymous set download rustfs/aitoearn-test >/dev/null"; then
-      echo "RustFS bucket aitoearn-test is ready."
+    if docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c "mc alias set rustfs http://192.168.3.6:9000 \"${rustfs_access_key}\" \"${rustfs_secret_key}\" >/dev/null && mc mb rustfs/${rustfs_bucket} --ignore-existing >/dev/null && mc anonymous set download rustfs/${rustfs_bucket} >/dev/null"; then
+      echo "RustFS bucket ${rustfs_bucket} is ready."
     else
-      echo "WARN: failed to create or configure RustFS bucket aitoearn-test."
+      echo "WARN: failed to create or configure RustFS bucket ${rustfs_bucket}."
     fi
   else
     echo "WARN: RustFS credentials were not found in /home/btcfoxman/docker/rustfs/.env."
