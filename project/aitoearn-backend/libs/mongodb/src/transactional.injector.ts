@@ -17,6 +17,7 @@ export class TransactionalInjector implements OnModuleInit {
   private readonly logger = new Logger(TransactionalInjector.name)
   private readonly metadataScanner: MetadataScanner = new MetadataScanner()
   private readonly transactionContext = new AsyncLocalStorage<TransactionContext>()
+  private transactionsSupported = true
 
   constructor(
     private readonly modulesContainer: ModulesContainer,
@@ -24,8 +25,30 @@ export class TransactionalInjector implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    this.transactionsSupported = await this.detectTransactionsSupported()
+    if (!this.transactionsSupported) {
+      this.logger.warn('MongoDB transactions are not supported by the current topology; @Transactional methods will run without transactions')
+    }
+
     for (const provider of this.getProviders()) {
       this.injectToProvider(provider)
+    }
+  }
+
+  private async detectTransactionsSupported(): Promise<boolean> {
+    try {
+      const db = this.connection.db
+      if (!db) {
+        return true
+      }
+
+      const hello = await db.admin().command({ hello: 1 })
+      return Boolean(hello['setName'] || hello['msg'] === 'isdbgrid')
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.warn(`Failed to detect MongoDB transaction support; assuming supported: ${message}`)
+      return true
     }
   }
 
@@ -84,6 +107,11 @@ export class TransactionalInjector implements OnModuleInit {
     return new Proxy(originalMethod, {
       apply: async (target, thisArg, args: unknown[]) => {
         const fullMethodName = `${className}.${methodName}`
+
+        if (!this.transactionsSupported) {
+          this.logger.debug(`Running transactional method without MongoDB transaction: ${fullMethodName}`)
+          return Reflect.apply(target, thisArg, args)
+        }
 
         const currentContext = this.transactionContext.getStore()
         if (currentContext?.inTransaction) {
