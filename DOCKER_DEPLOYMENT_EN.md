@@ -468,14 +468,14 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 |----------|-------------|
 | `VOLCENGINE_API_KEY` | Volcengine API key |
 | `VOLCENGINE_BASE_URL` | Volcengine or third-party API base URL, defaults to `https://ark.cn-beijing.volces.com/` |
-| `VOLCENGINE_VIDEO_REQUEST_MODE` | Video generation payload mode: `auto`, `official`, or `openai-compatible`, defaults to `auto` |
-| `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | Video generation tasks API path, defaults to `/api/v3/contents/generations/tasks` |
+| `VOLCENGINE_VIDEO_REQUEST_MODE` | Video generation payload mode: `official`, `openai-compatible`, or `auto`, defaults to `official`; official-compatible channels do not need this |
+| `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | Video generation tasks API path, defaults to `/api/v3/contents/generations/tasks`; official-compatible channels do not need this |
 | `VOLCENGINE_VIDEO_MODEL_CHANNELS` | Existing video models that should use the `volcengine` channel, comma-separated, for example `veo3.1-fast` |
 | `VOLCENGINE_ACCESS_KEY_ID` | Access Key ID |
 | `VOLCENGINE_SECRET_ACCESS_KEY` | Secret Access Key |
 | `VOLCENGINE_VOD_SPACE_NAME` | VOD space name |
 
-> If `doubao-seedance-2-0-fast-260128` video generation returns 401, first check that `VOLCENGINE_API_KEY` is not empty, is not prefixed with `Bearer `, and belongs to the official or third-party channel configured by `VOLCENGINE_BASE_URL`. `auto` mode uses an OpenAI-compatible payload for non-`volces.com` domains; if the third-party channel has special requirements, explicitly set `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible` or `official`. If the third-party endpoint path is not Ark's default path, also set `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`.
+> If `doubao-seedance-2-0-fast-260128` video generation returns 401, first check that `VOLCENGINE_API_KEY` is not empty, is not prefixed with `Bearer `, and belongs to the official or third-party channel configured by `VOLCENGINE_BASE_URL`. The default uses the official Ark payload, so official-compatible third-party channels only need `VOLCENGINE_BASE_URL` and `VOLCENGINE_API_KEY`. Set `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible` only when the third-party channel requires an OpenAI-compatible payload. If the third-party endpoint path is not Ark's default path, also set `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`.
 
 Features:
 - **Doubao video generation**: Configure in `ai.models.video.generation` with channel `volcengine`

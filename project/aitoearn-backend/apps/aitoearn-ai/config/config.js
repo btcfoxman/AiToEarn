@@ -119,7 +119,7 @@ module.exports = {
   ai: {
     volcengine: {
       baseUrl: VOLCENGINE_BASE_URL || 'https://ark.cn-beijing.volces.com/',
-      videoRequestMode: VOLCENGINE_VIDEO_REQUEST_MODE || 'auto',
+      videoRequestMode: VOLCENGINE_VIDEO_REQUEST_MODE || 'official',
       videoGenerationTasksPath: VOLCENGINE_VIDEO_GENERATION_TASKS_PATH || '/api/v3/contents/generations/tasks',
       apiKey: VOLCENGINE_API_KEY,
       accessKeyId: VOLCENGINE_ACCESS_KEY_ID,

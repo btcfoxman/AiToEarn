@@ -468,14 +468,14 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 |------|------|
 | `VOLCENGINE_API_KEY` | 火山引擎 API Key |
 | `VOLCENGINE_BASE_URL` | 火山/第三方渠道 API 地址，默认 `https://ark.cn-beijing.volces.com/` |
-| `VOLCENGINE_VIDEO_REQUEST_MODE` | 视频生成请求格式：`auto`、`official` 或 `openai-compatible`，默认 `auto` |
-| `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | 视频生成任务接口路径，默认 `/api/v3/contents/generations/tasks` |
+| `VOLCENGINE_VIDEO_REQUEST_MODE` | 视频生成请求格式：`official`、`openai-compatible` 或 `auto`，默认 `official`；官方兼容渠道无需配置 |
+| `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | 视频生成任务接口路径，默认 `/api/v3/contents/generations/tasks`；官方兼容渠道无需配置 |
 | `VOLCENGINE_VIDEO_MODEL_CHANNELS` | 指定走 `volcengine` 渠道的现有视频模型，多个用逗号分隔，例如 `veo3.1-fast` |
 | `VOLCENGINE_ACCESS_KEY_ID` | Access Key ID |
 | `VOLCENGINE_SECRET_ACCESS_KEY` | Secret Access Key |
 | `VOLCENGINE_VOD_SPACE_NAME` | VOD 点播空间名称 |
 
-> `doubao-seedance-2-0-fast-260128` 生成视频返回 401 时，优先检查 `VOLCENGINE_API_KEY` 是否为空、是否误填了 `Bearer ` 前缀，以及该 Key 是否属于当前 `VOLCENGINE_BASE_URL` 指向的官方或第三方渠道。`auto` 模式会对非 `volces.com` 域名使用 OpenAI 兼容 payload；如第三方渠道有特殊要求，可显式设置 `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible` 或 `official`。如第三方接口路径不是方舟默认路径，同步设置 `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`。
+> `doubao-seedance-2-0-fast-260128` 生成视频返回 401 时，优先检查 `VOLCENGINE_API_KEY` 是否为空、是否误填了 `Bearer ` 前缀，以及该 Key 是否属于当前 `VOLCENGINE_BASE_URL` 指向的官方或第三方渠道。默认使用官方方舟 payload，兼容官方接口的第三方渠道只需要配置 `VOLCENGINE_BASE_URL` 和 `VOLCENGINE_API_KEY`。仅当第三方渠道要求 OpenAI 兼容 payload 时，才显式设置 `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible`；如第三方接口路径不是方舟默认路径，再同步设置 `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`。
 
 提供以下功能：
 - **豆包视频生成**：在 `ai.models.video.generation` 中配置，channel 为 `volcengine`
