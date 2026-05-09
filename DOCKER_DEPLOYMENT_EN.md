@@ -470,6 +470,7 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 | `VOLCENGINE_BASE_URL` | Volcengine or third-party API base URL, defaults to `https://ark.cn-beijing.volces.com/` |
 | `VOLCENGINE_VIDEO_REQUEST_MODE` | Video generation payload mode: `auto`, `official`, or `openai-compatible`, defaults to `auto` |
 | `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | Video generation tasks API path, defaults to `/api/v3/contents/generations/tasks` |
+| `VOLCENGINE_VIDEO_MODEL_CHANNELS` | Existing video models that should use the `volcengine` channel, comma-separated, for example `veo3.1-fast` |
 | `VOLCENGINE_ACCESS_KEY_ID` | Access Key ID |
 | `VOLCENGINE_SECRET_ACCESS_KEY` | Secret Access Key |
 | `VOLCENGINE_VOD_SPACE_NAME` | VOD space name |

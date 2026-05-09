@@ -470,6 +470,7 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 | `VOLCENGINE_BASE_URL` | 火山/第三方渠道 API 地址，默认 `https://ark.cn-beijing.volces.com/` |
 | `VOLCENGINE_VIDEO_REQUEST_MODE` | 视频生成请求格式：`auto`、`official` 或 `openai-compatible`，默认 `auto` |
 | `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH` | 视频生成任务接口路径，默认 `/api/v3/contents/generations/tasks` |
+| `VOLCENGINE_VIDEO_MODEL_CHANNELS` | 指定走 `volcengine` 渠道的现有视频模型，多个用逗号分隔，例如 `veo3.1-fast` |
 | `VOLCENGINE_ACCESS_KEY_ID` | Access Key ID |
 | `VOLCENGINE_SECRET_ACCESS_KEY` | Secret Access Key |
 | `VOLCENGINE_VOD_SPACE_NAME` | VOD 点播空间名称 |

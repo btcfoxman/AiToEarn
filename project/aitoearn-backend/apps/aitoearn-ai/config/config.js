@@ -21,6 +21,7 @@ const {
   VOLCENGINE_BASE_URL,
   VOLCENGINE_VIDEO_REQUEST_MODE,
   VOLCENGINE_VIDEO_GENERATION_TASKS_PATH,
+  VOLCENGINE_VIDEO_MODEL_CHANNELS,
   VOLCENGINE_ACCESS_KEY_ID,
   VOLCENGINE_SECRET_ACCESS_KEY,
   VOLCENGINE_VOD_SPACE_NAME,
@@ -67,6 +68,16 @@ const ZERO_DURATION_PRICING = durations => durations.map(duration => ({ duration
 const ZERO_DURATION_RESOLUTION_PRICING = (durations, resolutions) =>
   durations.flatMap(duration => resolutions.map(resolution => ({ duration, resolution, price: 0 })))
 const SEEDANCE_DURATIONS = Array.from({ length: 12 }, (_, i) => i + 4)
+const VOLCENGINE_VIDEO_MODEL_CHANNEL_SET = new Set(
+  (VOLCENGINE_VIDEO_MODEL_CHANNELS || '')
+    .split(',')
+    .map(model => model.trim())
+    .filter(Boolean),
+)
+
+function videoModelChannel(model, defaultChannel) {
+  return VOLCENGINE_VIDEO_MODEL_CHANNEL_SET.has(model) ? 'volcengine' : defaultChannel
+}
 
 module.exports = {
   port: 3010,
@@ -341,7 +352,7 @@ module.exports = {
           {
             name: 'grok-video-3',
             description: 'Grok Video 3',
-            channel: 'grok',
+            channel: videoModelChannel('grok-video-3', 'grok'),
             modes: ['text2video', 'image2video', 'video2video'],
             resolutions: ['480p', '720p'],
             durations: Array.from({ length: 15 }, (_, i) => i + 1),
@@ -382,7 +393,7 @@ module.exports = {
           {
             name: 'veo3.1-components',
             description: 'Google Veo 3.1 Components',
-            channel: 'gemini',
+            channel: videoModelChannel('veo3.1-components', 'gemini'),
             modes: ['text2video', 'image2video', 'flf2video', 'multi-image2video', 'video2video'],
             resolutions: ['720p', '1080p', '4000'],
             durations: [4, 6, 7, 8],
@@ -398,7 +409,7 @@ module.exports = {
           {
             name: 'veo3.1-fast',
             description: 'Google Veo 3.1 Fast',
-            channel: 'gemini',
+            channel: videoModelChannel('veo3.1-fast', 'gemini'),
             modes: ['text2video', 'image2video', 'flf2video', 'video2video'],
             resolutions: ['720p', '1080p', '4000'],
             durations: [4, 6, 7, 8],
@@ -414,7 +425,7 @@ module.exports = {
           {
             name: 'veo3.1-pro',
             description: 'Google Veo 3.1 Pro',
-            channel: 'gemini',
+            channel: videoModelChannel('veo3.1-pro', 'gemini'),
             modes: ['text2video', 'image2video', 'flf2video'],
             resolutions: ['720p', '1080p', '4000'],
             durations: [4, 6, 8],
