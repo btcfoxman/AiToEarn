@@ -62,6 +62,13 @@ export function generateVideo(data: {
   image?: any
   image_tail?: string
   video_url?: string
+  audio_url?: string
+  reference_images?: string[]
+  reference_videos?: string[]
+  reference_audios?: string[]
+  referenceImages?: string[]
+  referenceVideos?: string[]
+  referenceAudios?: string[]
   size?: string
   duration?: number
   metadata?: Record<string, any>

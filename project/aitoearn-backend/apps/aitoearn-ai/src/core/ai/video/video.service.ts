@@ -7,9 +7,11 @@ import {
   Content,
   ContentType,
   GetVideoGenerationTaskResponse,
+  AudioRole,
   ImageRole,
   parseModelTextCommand,
   serializeModelTextCommand,
+  VideoRole,
 } from '../libs/volcengine'
 import { ModelsConfigService } from '../models-config'
 import { GeminiVeoVideoCallbackDto, GeminiVideoService, UserGeminiVeoVideoCreateRequestDto } from './gemini'
@@ -26,6 +28,10 @@ import { VolcengineVideoService } from './volcengine'
 
 type VideoModelConfig = {
   maxInputImages: number
+  maxReferenceImages?: number
+  maxReferenceVideos?: number
+  maxReferenceAudios?: number
+  modes?: string[]
   defaults?: {
     resolution?: string
     aspectRatio?: string
@@ -57,11 +63,22 @@ export class VideoService {
     if (!url) {
       return undefined
     }
+
+    if (/^(data:|asset:\/\/|gs:\/\/)/i.test(url)) {
+      return url
+    }
+
+    const objectPath = this.storageProvider.parsePathFromUrl(url)
+    if (objectPath.startsWith('http://') || objectPath.startsWith('https://')) {
+      return url
+    }
+
     return this.storageProvider.toPresignedUrl(url)
   }
 
   private async toPresignedUrls(urls: string[]): Promise<string[]> {
-    return Promise.all(urls.map(url => this.storageProvider.toPresignedUrl(url)))
+    const signedUrls = await Promise.all(urls.map(url => this.toPresignedUrl(url)))
+    return signedUrls.filter((url): url is string => Boolean(url))
   }
 
   async calculateVideoGenerationPrice(params: {
@@ -150,6 +167,39 @@ export class VideoService {
     return typeof value === 'number' ? value : undefined
   }
 
+  private getStringArray(value: unknown): string[] {
+    if (typeof value === 'string' && value.trim()) {
+      return [value.trim()]
+    }
+    if (!Array.isArray(value)) {
+      return []
+    }
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map(item => item.trim())
+  }
+
+  private uniqueStrings(values: string[]): string[] {
+    return [...new Set(values)]
+  }
+
+  private getRequestStringList(request: UserVideoGenerationRequestDto, snakeKey: string, camelKey: string): string[] {
+    const record = request as unknown as Record<string, unknown>
+    return this.uniqueStrings([
+      ...this.getStringArray(record[snakeKey]),
+      ...this.getStringArray(record[camelKey]),
+      ...this.getStringArray(request.metadata?.[snakeKey]),
+      ...this.getStringArray(request.metadata?.[camelKey]),
+    ])
+  }
+
+  private isReferenceMode(request: UserVideoGenerationRequestDto, imageList: string[], referenceCounts: number): boolean {
+    const mode = request.mode || this.getMetadataString(request, 'mode')
+    if (['reference2video', 'multimodal-reference', 'omni-reference', 'reference'].includes(mode || '')) {
+      return true
+    }
+    return referenceCounts > 0 || (!request.image_tail && imageList.length > 2)
+  }
+
   private getRequestImages(image: UserVideoGenerationRequestDto['image']): string[] {
     if (!image) {
       return []
@@ -188,12 +238,15 @@ export class VideoService {
     modelConfig: VideoModelConfig,
     createTaskResponse: (taskId: string, points: number) => T,
   ) {
-    const { userId, userType, model, prompt, duration, size, image, image_tail } = request
+    const { userId, userType, model, prompt, duration, size, image, image_tail, video_url, audio_url } = request
 
     const imageList = this.getRequestImages(image)
-    this.assertMaxInputImages(imageList, modelConfig)
-    const firstFrame = imageList[0]
-    const lastFrame = image_tail || imageList[1]
+    const configuredReferenceImages = this.getRequestStringList(request, 'reference_images', 'referenceImages')
+    const configuredReferenceVideos = this.getRequestStringList(request, 'reference_videos', 'referenceVideos')
+    const configuredReferenceAudios = this.getRequestStringList(request, 'reference_audios', 'referenceAudios')
+    const referenceCounts = configuredReferenceImages.length + configuredReferenceVideos.length + configuredReferenceAudios.length
+      + this.getStringArray(video_url).length + this.getStringArray(audio_url).length
+    const useReferenceMode = this.isReferenceMode(request, imageList, referenceCounts)
     const resolution = this.getMetadataString(request, 'resolution') || size || modelConfig.defaults?.resolution
     const aspectRatio = this.getMetadataString(request, 'aspectRatio') || modelConfig.defaults?.aspectRatio
     const finalDuration = duration ?? modelConfig.defaults?.duration
@@ -201,20 +254,89 @@ export class VideoService {
     const textCommand = parseModelTextCommand(prompt)
     const content: Content[] = []
 
-    if (firstFrame) {
-      content.push({
-        type: ContentType.ImageUrl,
-        image_url: { url: await this.toPresignedUrl(firstFrame) || firstFrame },
-        role: ImageRole.FirstFrame,
-      })
-    }
+    if (useReferenceMode) {
+      if (!modelConfig.modes?.includes('reference2video')) {
+        throw new BadRequestException('Selected model does not support reference2video mode')
+      }
+      if (image_tail) {
+        throw new BadRequestException('reference2video cannot be mixed with image_tail first/last-frame mode')
+      }
 
-    if (lastFrame) {
-      content.push({
-        type: ContentType.ImageUrl,
-        image_url: { url: await this.toPresignedUrl(lastFrame) || lastFrame },
-        role: ImageRole.LastFrame,
-      })
+      const referenceImages = this.uniqueStrings([...configuredReferenceImages, ...imageList])
+      const referenceVideos = this.uniqueStrings([
+        ...configuredReferenceVideos,
+        ...this.getStringArray(video_url),
+      ])
+      const referenceAudios = this.uniqueStrings([
+        ...configuredReferenceAudios,
+        ...this.getStringArray(audio_url),
+      ])
+
+      const maxReferenceImages = modelConfig.maxReferenceImages ?? modelConfig.maxInputImages
+      const maxReferenceVideos = modelConfig.maxReferenceVideos ?? 0
+      const maxReferenceAudios = modelConfig.maxReferenceAudios ?? 0
+
+      if (referenceImages.length > maxReferenceImages) {
+        throw new BadRequestException(`Too many reference images, max is ${maxReferenceImages}`)
+      }
+      if (referenceVideos.length > maxReferenceVideos) {
+        throw new BadRequestException(`Too many reference videos, max is ${maxReferenceVideos}`)
+      }
+      if (referenceAudios.length > maxReferenceAudios) {
+        throw new BadRequestException(`Too many reference audios, max is ${maxReferenceAudios}`)
+      }
+      if (referenceAudios.length > 0 && referenceImages.length + referenceVideos.length === 0) {
+        throw new BadRequestException('reference audio requires at least one reference image or reference video')
+      }
+      if (referenceImages.length + referenceVideos.length + referenceAudios.length === 0) {
+        throw new BadRequestException('reference2video requires at least one reference image, video, or audio')
+      }
+
+      for (const referenceImage of await this.toPresignedUrls(referenceImages)) {
+        content.push({
+          type: ContentType.ImageUrl,
+          image_url: { url: referenceImage },
+          role: ImageRole.ReferenceImage,
+        })
+      }
+      for (const referenceVideo of await this.toPresignedUrls(referenceVideos)) {
+        content.push({
+          type: ContentType.VideoUrl,
+          video_url: { url: referenceVideo },
+          role: VideoRole.ReferenceVideo,
+        })
+      }
+      for (const referenceAudio of await this.toPresignedUrls(referenceAudios)) {
+        content.push({
+          type: ContentType.AudioUrl,
+          audio_url: { url: referenceAudio },
+          role: AudioRole.ReferenceAudio,
+        })
+      }
+    }
+    else {
+      if (imageList.length > 2) {
+        throw new BadRequestException('First/last-frame mode supports at most 2 input images. Use mode=reference2video for Seedance multimodal references.')
+      }
+      this.assertMaxInputImages(imageList, { ...modelConfig, maxInputImages: Math.min(modelConfig.maxInputImages, 2) })
+      const firstFrame = imageList[0]
+      const lastFrame = image_tail || imageList[1]
+
+      if (firstFrame) {
+        content.push({
+          type: ContentType.ImageUrl,
+          image_url: { url: await this.toPresignedUrl(firstFrame) || firstFrame },
+          role: ImageRole.FirstFrame,
+        })
+      }
+
+      if (lastFrame) {
+        content.push({
+          type: ContentType.ImageUrl,
+          image_url: { url: await this.toPresignedUrl(lastFrame) || lastFrame },
+          role: ImageRole.LastFrame,
+        })
+      }
     }
 
     content.push({

@@ -11,6 +11,8 @@ export enum TaskStatus {
 export enum ContentType {
   Text = 'text',
   ImageUrl = 'image_url',
+  VideoUrl = 'video_url',
+  AudioUrl = 'audio_url',
 }
 
 // 图片角色枚举
@@ -18,6 +20,14 @@ export enum ImageRole {
   FirstFrame = 'first_frame',
   LastFrame = 'last_frame',
   ReferenceImage = 'reference_image',
+}
+
+export enum VideoRole {
+  ReferenceVideo = 'reference_video',
+}
+
+export enum AudioRole {
+  ReferenceAudio = 'reference_audio',
 }
 
 // 错误信息接口
@@ -31,6 +41,16 @@ export interface TaskError {
 // 图片URL接口
 export interface ImageUrl {
   /** 图片信息，可以是图片URL或图片Base64编码。图片URL需确保可被访问；Base64编码格式：data:image/<图片格式>;base64,<Base64编码> */
+  url: string
+}
+
+export interface VideoUrl {
+  /** Video URL or asset ID for Seedance multimodal reference generation. */
+  url: string
+}
+
+export interface AudioUrl {
+  /** Audio URL, base64 audio, or asset ID for Seedance multimodal reference generation. */
   url: string
 }
 
@@ -52,8 +72,26 @@ export interface ImageContent {
   role?: ImageRole
 }
 
+export interface VideoUrlContent {
+  /** Input content type, should be video_url. */
+  type: ContentType.VideoUrl
+  /** Video reference object. */
+  video_url: VideoUrl
+  /** Video role. Currently only reference_video is supported. */
+  role: VideoRole
+}
+
+export interface AudioUrlContent {
+  /** Input content type, should be audio_url. */
+  type: ContentType.AudioUrl
+  /** Audio reference object. */
+  audio_url: AudioUrl
+  /** Audio role. Currently only reference_audio is supported. */
+  role: AudioRole
+}
+
 // 内容联合类型
-export type Content = TextContent | ImageContent
+export type Content = TextContent | ImageContent | VideoUrlContent | AudioUrlContent
 
 // 视频内容接口
 export interface VideoContent {
@@ -171,7 +209,8 @@ export type Ratio
 
 // 支持的模型
 export type VideoModel
-  = | 'doubao-seedance-2-0-fast-260128'
+  = | 'doubao-seedance-2-0-260128'
+    | 'doubao-seedance-2-0-fast-260128'
     | string
 
 // ========== 视频点播 (VOD) 相关接口 ==========

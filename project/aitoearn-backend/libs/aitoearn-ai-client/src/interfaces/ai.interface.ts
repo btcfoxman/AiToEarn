@@ -163,6 +163,8 @@ export enum VolcengineTaskStatus {
 export enum VolcengineContentType {
   Text = 'text',
   ImageUrl = 'image_url',
+  VideoUrl = 'video_url',
+  AudioUrl = 'audio_url',
 }
 
 // Volcengine 图片角色枚举
@@ -172,12 +174,28 @@ export enum VolcengineImageRole {
   ReferenceImage = 'reference_image',
 }
 
+export enum VolcengineVideoRole {
+  ReferenceVideo = 'reference_video',
+}
+
+export enum VolcengineAudioRole {
+  ReferenceAudio = 'reference_audio',
+}
+
 // Video DTO 接口
 export interface VideoGenerationRequestDto {
   model: string
   prompt: string
   image?: string | string[]
   image_tail?: string
+  video_url?: string
+  audio_url?: string
+  reference_images?: string[]
+  reference_videos?: string[]
+  reference_audios?: string[]
+  referenceImages?: string[]
+  referenceVideos?: string[]
+  referenceAudios?: string[]
   mode?: string
   size?: string
   duration?: number
@@ -203,6 +221,20 @@ export interface VolcengineGenerationRequestDto {
         url: string
       }
       role?: VolcengineImageRole
+    }
+    | {
+      type: VolcengineContentType.VideoUrl
+      video_url: {
+        url: string
+      }
+      role: VolcengineVideoRole
+    }
+    | {
+      type: VolcengineContentType.AudioUrl
+      audio_url: {
+        url: string
+      }
+      role: VolcengineAudioRole
     }
   >
   return_last_frame?: boolean
@@ -285,11 +317,14 @@ export interface VideoGenerationModelParamsVo {
   logo?: string
   tags: string[]
   mainTag?: string
-  modes: ('text2video' | 'image2video' | 'flf2video' | 'lf2video' | 'multi-image2video')[]
+  modes: ('text2video' | 'image2video' | 'flf2video' | 'lf2video' | 'multi-image2video' | 'video2video' | 'reference2video')[]
   channel: AiLogChannel
   resolutions: string[]
   durations: number[]
   maxInputImages: number
+  maxReferenceImages?: number
+  maxReferenceVideos?: number
+  maxReferenceAudios?: number
   aspectRatios: string[]
   defaults: {
     resolution?: string

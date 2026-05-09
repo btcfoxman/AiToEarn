@@ -297,9 +297,18 @@ export class VolcengineVideoService {
   }
 
   extractInput(request: Record<string, unknown>) {
-    const content = request['content'] as Array<{ type: string, text?: string, image_url?: { url: string } }> | undefined
+    const content = request['content'] as Array<{
+      type: string
+      text?: string
+      image_url?: { url: string }
+      video_url?: { url: string }
+      audio_url?: { url: string }
+    }> | undefined
     let prompt = ''
     let image: string | undefined
+    let referenceImages: string[] | undefined
+    let referenceVideos: string[] | undefined
+    let referenceAudios: string[] | undefined
     let duration: number | undefined
     let resolution: string | undefined
     let aspectRatio: string | undefined
@@ -317,9 +326,27 @@ export class VolcengineVideoService {
       if (imageContent && imageContent.image_url) {
         image = imageContent.image_url.url
       }
+      referenceImages = content
+        .filter(c => c.type === ContentType.ImageUrl && c.image_url)
+        .map(c => c.image_url!.url)
+      referenceVideos = content
+        .filter(c => c.type === ContentType.VideoUrl && c.video_url)
+        .map(c => c.video_url!.url)
+      referenceAudios = content
+        .filter(c => c.type === ContentType.AudioUrl && c.audio_url)
+        .map(c => c.audio_url!.url)
     }
 
-    return { prompt, image, duration, resolution, aspectRatio }
+    return {
+      prompt,
+      image,
+      referenceImages: referenceImages?.length ? referenceImages : undefined,
+      referenceVideos: referenceVideos?.length ? referenceVideos : undefined,
+      referenceAudios: referenceAudios?.length ? referenceAudios : undefined,
+      duration,
+      resolution,
+      aspectRatio,
+    }
   }
 
   async getTask(userId: string, userType: UserType, taskId: string) {

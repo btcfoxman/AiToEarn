@@ -477,6 +477,8 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 
 > If `doubao-seedance-2-0-fast-260128` video generation returns 401, first check that `VOLCENGINE_API_KEY` is not empty, is not prefixed with `Bearer `, and belongs to the official or third-party channel configured by `VOLCENGINE_BASE_URL`. The default uses the official Ark payload, so official-compatible third-party channels only need `VOLCENGINE_BASE_URL` and `VOLCENGINE_API_KEY`. Set `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible` only when the third-party channel requires an OpenAI-compatible payload. If the third-party endpoint path is not Ark's default path, also set `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`.
 
+> Seedance 2.0 / 2.0 Fast supports `reference2video` multimodal reference generation. The common video generation API accepts `mode=reference2video` with `reference_images` / `reference_videos` / `reference_audios` (or camelCase equivalents): up to 9 reference images, 3 reference videos, and 3 reference audios. Audio references cannot be used alone; include at least one reference image or reference video.
+
 Features:
 - **Doubao video generation**: Configure in `ai.models.video.generation` with channel `volcengine`
 - **Aideo**: AI video editing features including style transfer, video understanding, highlight editing, facial translation, subtitle erasing, video editing, drama recap, and style migration. All pricing must be `0`

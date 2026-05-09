@@ -1,6 +1,6 @@
 import { createZodDto, UserType } from '@yikart/common'
 import { z } from 'zod'
-import { ContentType, ImageRole, TaskStatus } from '../../libs/volcengine'
+import { AudioRole, ContentType, ImageRole, TaskStatus, VideoRole } from '../../libs/volcengine'
 
 // Volcengine视频生成请求
 const volcengineGenerationRequestSchema = z.object({
@@ -16,6 +16,20 @@ const volcengineGenerationRequestSchema = z.object({
         url: z.string(),
       }),
       role: z.enum(ImageRole).optional(),
+    }),
+    z.object({
+      type: z.literal(ContentType.VideoUrl),
+      video_url: z.object({
+        url: z.string(),
+      }),
+      role: z.enum(VideoRole),
+    }),
+    z.object({
+      type: z.literal(ContentType.AudioUrl),
+      audio_url: z.object({
+        url: z.string(),
+      }),
+      role: z.enum(AudioRole),
     }),
   ])).describe('输入内容'),
   return_last_frame: z.boolean().optional().describe('是否返回尾帧图像'),

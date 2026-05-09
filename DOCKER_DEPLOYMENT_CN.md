@@ -477,6 +477,8 @@ GEMINI_KEY_PAIRS: '[{"projectId":"your-project","apiKey":"your-key","keyFile":"/
 
 > `doubao-seedance-2-0-fast-260128` 生成视频返回 401 时，优先检查 `VOLCENGINE_API_KEY` 是否为空、是否误填了 `Bearer ` 前缀，以及该 Key 是否属于当前 `VOLCENGINE_BASE_URL` 指向的官方或第三方渠道。默认使用官方方舟 payload，兼容官方接口的第三方渠道只需要配置 `VOLCENGINE_BASE_URL` 和 `VOLCENGINE_API_KEY`。仅当第三方渠道要求 OpenAI 兼容 payload 时，才显式设置 `VOLCENGINE_VIDEO_REQUEST_MODE=openai-compatible`；如第三方接口路径不是方舟默认路径，再同步设置 `VOLCENGINE_VIDEO_GENERATION_TASKS_PATH`。
 
+> Seedance 2.0 / 2.0 Fast 支持 `reference2video` 全能参考模式。通用视频生成接口可传 `mode=reference2video`，并使用 `reference_images` / `reference_videos` / `reference_audios`（或 camelCase 等价字段）传入素材：最多 9 张参考图、3 段参考视频、3 段参考音频。音频参考不可单独使用，至少需要 1 张参考图或 1 段参考视频。
+
 提供以下功能：
 - **豆包视频生成**：在 `ai.models.video.generation` 中配置，channel 为 `volcengine`
 - **Aideo**：AI 视频编辑系列功能，包括视频风格转换、视频理解、高光智剪、面容翻译、字幕擦除、视频编辑、短剧解说、风格迁移，定价必须全部为 `0`
