@@ -146,12 +146,40 @@ jobs:
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
+      - name: Prepare repository checkout
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          work_dir="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}"
+          rm -rf "${work_dir}"
+          mkdir -p "${work_dir}"
+          cd "${work_dir}"
+
+          git init
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: bearer ${GIT_AUTH_TOKEN}"
+          cleanup_git_auth() {
+            git config --local --unset-all http.https://github.com/.extraheader >/dev/null 2>&1 || true
+          }
+          trap cleanup_git_auth EXIT
+
+          for i in 1 2 3; do
+            if git fetch --no-tags --depth=1 origin "+${GITHUB_REF}:refs/remotes/origin/action-ref"; then
+              break
+            fi
+            if [ "${i}" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((i * 5))
+          done
+
+          git checkout --detach "${GITHUB_SHA}"
+          cleanup_git_auth
+          echo "REPO_WORK_DIR=${work_dir}" >> "${GITHUB_ENV}"
 
       - name: Deploy
         run: |
           set -euo pipefail
+          cd "${REPO_WORK_DIR}"
           bash deploy/test/deploy.sh
