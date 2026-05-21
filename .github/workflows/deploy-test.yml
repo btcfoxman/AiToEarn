@@ -146,36 +146,40 @@ jobs:
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
     steps:
-      - name: Prepare repository checkout
+      - name: Download repository archive
         env:
-          GIT_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCHIVE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           work_dir="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}"
+          archive_path="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}.tar.gz"
           rm -rf "${work_dir}"
           mkdir -p "${work_dir}"
-          cd "${work_dir}"
 
-          git init
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git config --local http.https://github.com/.extraheader "AUTHORIZATION: bearer ${GIT_AUTH_TOKEN}"
-          cleanup_git_auth() {
-            git config --local --unset-all http.https://github.com/.extraheader >/dev/null 2>&1 || true
-          }
-          trap cleanup_git_auth EXIT
-
-          for i in 1 2 3; do
-            if git fetch --no-tags --depth=1 origin "+${GITHUB_REF}:refs/remotes/origin/action-ref"; then
+          archive_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}"
+          for i in 1 2 3 4 5; do
+            rm -f "${archive_path}"
+            if curl --fail --location --silent --show-error \
+              --connect-timeout 30 \
+              --max-time 900 \
+              --retry 2 \
+              --retry-delay 5 \
+              -H "Authorization: Bearer ${ARCHIVE_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${archive_url}" \
+              -o "${archive_path}" \
+              && tar -tzf "${archive_path}" >/dev/null 2>&1; then
               break
             fi
-            if [ "${i}" -eq 3 ]; then
+
+            if [ "${i}" -eq 5 ]; then
               exit 1
             fi
-            sleep $((i * 5))
+            sleep $((i * 10))
           done
 
-          git checkout --detach "${GITHUB_SHA}"
-          cleanup_git_auth
+          tar -xzf "${archive_path}" --strip-components=1 -C "${work_dir}"
+          rm -f "${archive_path}"
           echo "REPO_WORK_DIR=${work_dir}" >> "${GITHUB_ENV}"
 
       - name: Deploy
