@@ -70,4 +70,3 @@ jobs:
         if: steps.check-changes.outputs.changed == 'true'
         working-directory: ${{ env.MONOREPO_DIR }}
         run: pnpm nx run-many --target=build --nxBail --outputStyle=static
-
