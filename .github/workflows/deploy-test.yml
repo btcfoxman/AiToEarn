@@ -145,6 +145,7 @@ jobs:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
+      ARCHIVE_PROXY_URLS: "http://127.0.0.1:10809 http://xray:10809 direct"
     steps:
       - name: Download repository archive
         env:
@@ -158,19 +159,33 @@ jobs:
 
           archive_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}"
           for i in 1 2 3 4 5; do
-            rm -f "${archive_path}"
-            if curl --fail --location --silent --show-error \
-              --connect-timeout 30 \
-              --max-time 900 \
-              --retry 2 \
-              --retry-delay 5 \
-              -H "Authorization: Bearer ${ARCHIVE_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "${archive_url}" \
-              -o "${archive_path}" \
-              && tar -tzf "${archive_path}" >/dev/null 2>&1; then
-              break
-            fi
+            for proxy_url in ${ARCHIVE_PROXY_URLS}; do
+              rm -f "${archive_path}"
+              proxy_args=()
+              proxy_label="direct"
+              if [ "${proxy_url}" != "direct" ]; then
+                proxy_args=(--proxy "${proxy_url}")
+                proxy_label="${proxy_url}"
+              fi
+
+              echo "Downloading repository archive via ${proxy_label} (attempt ${i})"
+              if curl --fail --location --silent --show-error \
+                --connect-timeout 15 \
+                --max-time 900 \
+                --speed-limit 1024 \
+                --speed-time 60 \
+                --retry 2 \
+                --retry-delay 5 \
+                "${proxy_args[@]}" \
+                -H "Authorization: Bearer ${ARCHIVE_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "${archive_url}" \
+                -o "${archive_path}" \
+                && tar -tzf "${archive_path}" >/dev/null 2>&1; then
+                echo "Repository archive downloaded via ${proxy_label}"
+                break 2
+              fi
+            done
 
             if [ "${i}" -eq 5 ]; then
               exit 1
