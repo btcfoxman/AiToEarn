@@ -4,16 +4,16 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache libc6-compat
 
-RUN corepack enable pnpm && corepack prepare pnpm@latest --activate
+RUN corepack enable pnpm && corepack prepare pnpm@10 --activate
 
 WORKDIR /app
 
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY scripts ./scripts
 
-RUN pnpm install --frozen-lockfile --prod=false
+RUN HUSKY=0 pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 WORKDIR /app
