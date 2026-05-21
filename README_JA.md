@@ -13,7 +13,7 @@
 AiToEarnは**AI自動化**を通じて、クリエイター、ブランド、企業が世界中の主要プラットフォームでコンテンツを構築、配信、収益化するのを支援します。
 
 対応チャンネル：
-抖音（Douyin）、小紅書（Rednote）、快手（Kuaishou）、bilibili、TikTok、YouTube、Facebook、Instagram、Threads、Twitter（X）、Pinterest、LinkedIn
+抖音（Douyin）、小紅書（Rednote）、快手（Kuaishou）、bilibili、視頻号（WeChat Channels）、微信公式アカウント（WeChat Official Accounts）、TikTok、YouTube、Facebook、Instagram、Threads、Twitter（X）、Pinterest、LinkedIn
 
 ## 🚀 AiToEarnをすぐに使う（5つの方法）
 
@@ -29,6 +29,7 @@ AiToEarnは**AI自動化**を通じて、クリエイター、ブランド、企
 
 ## 最新情報
 
+- **2026-05-21**: [2.4バージョン](https://github.com/yikart/AiToEarn/releases/tag/v2.4.0) — 草稿生成が HappyHorse 1.0 と Seedance 2.0 に新対応。動画・画像/テキスト草稿の一括生成、複数モデル選択、参照画像/動画、対象プラットフォーム制限、文案プロンプトを強化し、新しいUIスタイルと Twitter/X の探索・エンゲージメント機能も強化しました。
 - **2026-04-20**: OpenClaw（ロブスター）で AiToEarn の収益化タスクに新対応し、OpenClaw 内で直接受け取り実行できるようになりました。
 - **2026-03-26**: [2.1バージョン](https://www.aitoearn.ai/) — コンテンツ取引マーケットプレイスをリリース。OpenClaw（ロブスター）対応を追加し、OpenClaw内で直接AiToEarnを使用可能に。MCPプロトコル対応を追加し、Claude、CursorなどMCP対応のエージェントやLLMでAiToEarnを使用可能に。
 - **2026-02-07**: [1.8.0バージョン](https://www.aitoearn.ai/) — オフライン店舗プロモーションソリューションを追加。レストラン、小売店、民宿、美容室、ジムなど多様なオフラインビジネスに対応。オフラインのプロモーション活動を実行可能なオンライン拡散タスクに変換し、コンテンツ公開とユーザー参加メカニズムを通じて店舗のオンライン露出と来店トラフィックの増加を支援。
@@ -82,7 +83,7 @@ AiToEarnの最も重要な目標：**すべてのクリエイターが稼げる�
 
 ワンクリックで世界中の10以上の主要プラットフォームにコンテンツを配信。各プラットフォームで手動投稿する手間から解放されます。
 
-- **マルチプラットフォーム配信**：抖音、快手、B站、小紅書、TikTok、YouTube、Facebook、Instagram、Threads、X（Twitter）、Pinterest、LinkedInに対応
+- **マルチプラットフォーム配信**：抖音、快手、B站、小紅書、視頻号（WeChat Channels）、微信公式アカウント（WeChat Official Accounts）、TikTok、YouTube、Facebook、Instagram、Threads、X（Twitter）、Pinterest、LinkedInに対応
 - **カレンダースケジュール**：カレンダーのように全プラットフォームのコンテンツ公開時間を統一的に計画
 
 <div style="display: flex; justify-content: space-around;">
@@ -168,7 +169,7 @@ AiToEarnブラウザ拡張機能を通じて、上記のすべてのプラット
 npx -y @aitoearn/openclaw-plugin-cli
 ```
 
-初回実行時は案内に従って必要な項目を選択し、API Key を入力してインストールと設定を完了してください。
+初回実行時は環境を選択し、API Key を入力してください。中国版は `aitoearn.cn` の API Key、国際版は `aitoearn.ai` の API Key を使用します。環境と Key が一致しない場合は 401 になります。
 
 設定後は、OpenClaw 内で AiToEarn の収益化タスクを直接受け取り実行できます。
 
@@ -181,6 +182,13 @@ npx -y @aitoearn/openclaw-plugin-cli
 > 前提条件：[API Keyを取得済み](#get-api-key)
 
 AiToEarnはMCPプロトコルに対応するすべてのAIアシスタントで動作します。一般的なツールの設定方法：
+
+API Key の取得元に合わせて URL を選択してください。環境と Key が一致しない場合は 401 になります。
+
+| 環境 | MCP URL | SSE URL |
+|------|---------|---------|
+| 中国版 | `https://aitoearn.cn/api/unified/mcp` | `https://aitoearn.cn/api/unified/sse` |
+| 国際版 | `https://aitoearn.ai/api/unified/mcp` | `https://aitoearn.ai/api/unified/sse` |
 
 <details open>
 <summary><b>Claude Desktop</b></summary>
@@ -253,10 +261,12 @@ docker compose up -d
 
 `docker-compose.yml`の`aitoearn-server`サービスに以下を追加（API Keyの取得方法は[上記](#get-api-key)を参照）：
 
+`RELAY_API_KEY` の取得元に合わせて `RELAY_SERVER_URL` を選択してください。中国版 Key は `https://aitoearn.cn/api`、国際版 Key は `https://aitoearn.ai/api` を使用します。環境と Key が一致しない場合は 401 になります。
+
 ```yaml
 RELAY_SERVER_URL: https://aitoearn.ai/api
 RELAY_API_KEY: あなたのAPI-Key
-RELAY_CALLBACK_URL: http://127.0.0.1:8080/api/plat/relay-callback
+RELAY_CALLBACK_URL: http://localhost:8080/api/plat/relay-callback
 ```
 
 その後再起動：`docker compose restart aitoearn-server`

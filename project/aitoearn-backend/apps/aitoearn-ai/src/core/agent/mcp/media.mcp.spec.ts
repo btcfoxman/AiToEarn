@@ -1,3 +1,4 @@
+import type { AiAvailabilityService } from '../../ai-availability'
 import { Logger } from '@nestjs/common'
 import { UserType } from '@yikart/common'
 import { AiLogStatus } from '@yikart/mongodb'
@@ -11,6 +12,7 @@ describe('mediaMcp', () => {
   let mockLogger: Logger
   let mockOpenaiVideoService: vi.Mocked<OpenAIVideoService>
   let mockImageService: vi.Mocked<ImageService>
+  let mockAiAvailability: vi.Mocked<Pick<AiAvailabilityService, 'execute'>>
   let mockGeminiVideoService: vi.Mocked<GeminiVideoService>
   let mockGrokVideoService: vi.Mocked<GrokVideoService>
 
@@ -35,19 +37,21 @@ describe('mediaMcp', () => {
       userGeminiGeneration: vi.fn(),
     } as unknown as vi.Mocked<ImageService>
 
+    mockAiAvailability = {
+      execute: vi.fn().mockImplementation((_ctx: unknown, fn: () => unknown) => (fn as () => Promise<unknown>)()),
+    } as unknown as vi.Mocked<Pick<AiAvailabilityService, 'execute'>>
+
     mockGeminiVideoService = {
       createVideo: vi.fn(),
       getVideo: vi.fn(),
     } as unknown as vi.Mocked<GeminiVideoService>
 
-    mockGrokVideoService = {
-      createVideo: vi.fn(),
-      getTask: vi.fn(),
-    } as unknown as vi.Mocked<GrokVideoService>
+    mockGrokVideoService = {} as vi.Mocked<GrokVideoService>
 
     mediaMcp = new MediaMcp(
       mockOpenaiVideoService,
       mockImageService,
+      mockAiAvailability as unknown as AiAvailabilityService,
       mockGeminiVideoService,
       mockGrokVideoService,
     )
@@ -496,7 +500,7 @@ describe('mediaMcp', () => {
       await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo3.1-fast',
+          model: 'veo-3.1-fast-generate-001',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -507,7 +511,7 @@ describe('mediaMcp', () => {
         userId,
         userType,
         prompt: 'A sunset over the ocean',
-        model: 'veo3.1-fast',
+        model: 'veo-3.1-fast-generate-001',
         aspectRatio: '16:9',
         duration: 8,
         resolution: '720p',
@@ -523,7 +527,7 @@ describe('mediaMcp', () => {
       const result = await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo3.1-fast',
+          model: 'veo-3.1-fast-generate-001',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -545,7 +549,7 @@ describe('mediaMcp', () => {
       const result = await tool.handler({
         params: {
           prompt: 'A sunset over the ocean',
-          model: 'veo3.1-fast',
+          model: 'veo-3.1-fast-generate-001',
           aspectRatio: '16:9',
           duration: 8,
           resolution: '720p',
@@ -568,7 +572,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Success,
-        model: 'veo3.1-fast',
+        model: 'veo-3.1-fast-generate-001',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 60000),
         completedAt: new Date(),
@@ -592,7 +596,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Failed,
-        model: 'veo3.1-fast',
+        model: 'veo-3.1-fast-generate-001',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 60000),
         completedAt: null,
@@ -613,7 +617,7 @@ describe('mediaMcp', () => {
       mockGeminiVideoService.getVideo.mockResolvedValue({
         name: 'test-operation',
         status: AiLogStatus.Generating,
-        model: 'veo3.1-fast',
+        model: 'veo-3.1-fast-generate-001',
         prompt: 'A sunset over the ocean',
         createdAt: new Date(Date.now() - 30000),
         completedAt: null,
@@ -640,8 +644,6 @@ describe('mediaMcp', () => {
       const toolNames = server.tools?.map(t => t.name)
 
       expect(toolNames).toContain(MediaToolName.GenerateImage)
-      expect(toolNames).toContain(MediaToolName.GenerateVideoWithVeo)
-      expect(toolNames).toContain(MediaToolName.GetVeoVideoStatus)
       expect(toolNames).toContain(MediaToolName.GenerateVideoWithGrok)
       expect(toolNames).toContain(MediaToolName.GetGrokVideoStatus)
     })

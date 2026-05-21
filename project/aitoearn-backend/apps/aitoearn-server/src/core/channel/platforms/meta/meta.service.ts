@@ -6,7 +6,7 @@ import {
   NewAccount,
 } from '@yikart/aitoearn-server-client'
 import { Account, OAuth2CredentialRepository } from '@yikart/channel-db'
-import { AppException, getErrorMessage, getErrorStack, ResponseCode } from '@yikart/common'
+import { getErrorMessage, getErrorStack } from '@yikart/common'
 import { RedisService } from '@yikart/redis'
 import axios, { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { getCurrentTimestamp } from '../../../../common/utils/time.util'
@@ -88,10 +88,12 @@ export class MetaService {
       params.append('config_id', oauthConfig.configId)
     }
     const pkceEnabled = metaOAuth2ConfigMap[platform].pkce
+    let codeVerifier = ''
+    let codeChallenge = ''
     if (pkceEnabled) {
       params.append('code_challenge_method', 'S256')
-      const codeVerifier = randomBytes(64).toString('hex')
-      const codeChallenge = createHash('sha256')
+      codeVerifier = randomBytes(64).toString('hex')
+      codeChallenge = createHash('sha256')
         .update(codeVerifier)
         .digest('base64url')
       params.append('code_challenge', codeChallenge)
@@ -107,7 +109,8 @@ export class MetaService {
         state,
         status: 0,
         userId,
-        pkce: false,
+        pkce: pkceEnabled,
+        codeVerifier,
         platform,
         spaceId,
         callbackUrl,
@@ -118,250 +121,6 @@ export class MetaService {
     return success
       ? { url: authorizeURL.toString(), taskId: state, state }
       : null
-  }
-
-  /**
-   * 生成不需用户授权URL（Instagram）
-   */
-  async getNoUserAuthUrl(materialGroupId: string) {
-    const platform = 'instagram'
-    const oauthConfig = config.channel.oauth[platform]
-    const scopes = oauthConfig.scopes || metaOAuth2ConfigMap[platform].defaultScopes
-    const scopeSeparator = metaOAuth2ConfigMap[platform].scopesSeparator
-
-    const params = new URLSearchParams({
-      client_id: oauthConfig.clientId,
-      redirect_uri: oauthConfig.promotionRedirectUri,
-      response_type: 'code',
-      state: materialGroupId,
-    })
-
-    if (scopes.length > 1) {
-      params.append('scope', scopes.join(scopeSeparator))
-    }
-    else {
-      params.append('scope', scopes[0])
-    }
-
-    const authorizeURL = new URL(metaOAuth2ConfigMap[platform].authURL)
-    authorizeURL.search = params.toString()
-
-    this.logger.debug(`Generated Instagram no-user auth URL: ${authorizeURL.toString()}`)
-
-    return { url: authorizeURL.toString(), state: materialGroupId }
-  }
-
-  /**
-   * 处理Instagram授权重定向 - 创建账号并重定向到指定URL
-   */
-  async handleAuthRedirect(code: string, state: string): Promise<{ redirectUrl: string }> {
-    const platform = 'instagram'
-    this.logger.log({
-      path: 'meta handleAuthRedirect --- 0 start',
-      data: { code: `${code.substring(0, 20)}...`, state },
-    })
-
-    // 获取访问令牌 - 使用promotionRedirectUri
-    let credential: OAuth2Credential | null = null
-    try {
-      credential = await this.getOAuthCredentialForRedirect(code, platform)
-    }
-    catch (error) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- error getting credential',
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-      })
-      throw new AppException(ResponseCode.ChannelAccessTokenFailed, { step: 'getOAuthCredential', error: (error as Error).message })
-    }
-
-    if (!credential) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- credential is null',
-      })
-      throw new AppException(ResponseCode.ChannelAccessTokenFailed, { step: 'getOAuthCredential', error: 'credential is null' })
-    }
-
-    this.logger.log({
-      path: 'meta handleAuthRedirect --- 1 got credential',
-      data: { hasAccessToken: !!credential.access_token },
-    })
-
-    // 获取用户信息
-    let userProfile: any = null
-    try {
-      userProfile = await this.getUserProfile(credential.access_token, platform)
-    }
-    catch (error) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- error getting user profile',
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-      })
-      throw new AppException(ResponseCode.ChannelAccountInfoFailed, { step: 'getUserProfile', error: (error as Error).message })
-    }
-
-    if (!userProfile) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- userProfile is null',
-      })
-      throw new AppException(ResponseCode.ChannelAccountInfoFailed, { step: 'getUserProfile', error: 'userProfile is null' })
-    }
-
-    this.logger.log({
-      path: 'meta handleAuthRedirect --- 2 got userProfile',
-      data: { id: userProfile.id, username: userProfile.username },
-    })
-
-    // 创建账号数据（无用户授权场景，userId为空）
-    const accountType = platform as AccountType
-    const newAccountData = new NewAccount({
-      userId: '',
-      type: accountType,
-      uid: userProfile.id || userProfile.sub,
-      account: userProfile.username || userProfile.name,
-      avatar: userProfile.profile_picture_url || '',
-      nickname: userProfile.username || userProfile.name,
-      lastStatsTime: new Date(),
-      loginTime: new Date(),
-      status: AccountStatus.NORMAL,
-    })
-
-    let accountInfo: any = null
-    try {
-      accountInfo = await this.channelAccountService.createAccount(
-        {
-          type: accountType,
-          uid: userProfile.id || userProfile.sub,
-        },
-        newAccountData,
-      )
-    }
-    catch (error) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- error creating account',
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-      })
-      throw new AppException(ResponseCode.AccountCreateFailed, { step: 'createAccount', error: (error as Error).message })
-    }
-
-    this.logger.log({
-      path: 'meta handleAuthRedirect --- 3 created account',
-      data: { accountId: accountInfo?.id },
-    })
-
-    if (!accountInfo) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- accountInfo is null',
-      })
-      throw new AppException(ResponseCode.AccountCreateFailed, { step: 'createAccount', error: 'accountInfo is null' })
-    }
-
-    // 保存访问令牌
-    try {
-      const userCredential = {
-        ...credential,
-        user_id: userProfile.id || userProfile.sub,
-      } as MetaUserOAuthCredential
-
-      await this.saveOAuthCredential(accountInfo.id, userCredential, platform)
-    }
-    catch (error) {
-      this.logger.error({
-        path: 'meta handleAuthRedirect --- error saving credential',
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-      })
-      // 不抛出异常，继续执行
-    }
-
-    // 构建重定向URL
-    const baseUrl = config.channel.oauth[platform as keyof typeof config.channel.oauth].promotionBaseUrl
-    const redirectUrl = `${baseUrl}?accountId=${accountInfo.id}&materialGroupId=${state}&platform=${platform}`
-
-    this.logger.log({
-      path: 'meta handleAuthRedirect --- 4 success',
-      data: { redirectUrl },
-    })
-
-    return { redirectUrl }
-  }
-
-  private async getOAuthCredentialForRedirect(
-    code: string,
-    platform: string,
-  ): Promise<OAuth2Credential | null> {
-    const accessTokenURL = metaOAuth2ConfigMap[platform].accessTokenURL
-    const longLivedAccessTokenURL = metaOAuth2ConfigMap[platform].longLivedAccessTokenURL || ''
-    const oauthPlatformConfig = config.channel.oauth[platform as keyof typeof config.channel.oauth]
-    const redirectURI = oauthPlatformConfig.promotionRedirectUri
-    const clientId = oauthPlatformConfig.clientId
-    const clientSecret = oauthPlatformConfig.clientSecret
-    const requestAccessTokenMethod = metaOAuth2ConfigMap[platform].requestAccessTokenMethod
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectURI,
-    })
-
-    this.logger.log(`Requesting access token with params: ${params.toString()}`)
-
-    const reqConfig: AxiosRequestConfig = {
-      method: requestAccessTokenMethod,
-      url: accessTokenURL,
-    }
-
-    if (requestAccessTokenMethod === 'POST') {
-      reqConfig.headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      }
-      reqConfig.data = params.toString()
-    }
-    else {
-      reqConfig.params = params
-    }
-
-    try {
-      const response: AxiosResponse<OAuth2Credential> = await axios.request(reqConfig)
-      this.logger.log(`Access token response: ${JSON.stringify(response.data)}`)
-
-      if (longLivedAccessTokenURL) {
-        const llAccessTokenReqParamsMap = metaOAuth2ConfigMap[platform].longLivedParamsMap
-        const lParams: Record<string, string> = {
-          client_id: clientId,
-          client_secret: clientSecret,
-        }
-        const accessTokenKey = llAccessTokenReqParamsMap?.['access_token'] || 'access_token'
-        lParams[accessTokenKey] = response.data.access_token
-        lParams['grant_type'] = metaOAuth2ConfigMap[platform].longLivedGrantType || 'ig_exchange_token'
-
-        const longLivedAccessTokenReqParams = new URLSearchParams(lParams)
-        const llTokenResponse: AxiosResponse<OAuth2Credential> = await axios.get(
-          longLivedAccessTokenURL,
-          { params: longLivedAccessTokenReqParams },
-        )
-        const credential = llTokenResponse.data
-        if (!credential.expires_in) {
-          credential.expires_in = META_TIME_CONSTANTS.FACEBOOK_LONG_LIVED_TOKEN_DEFAULT_EXPIRE
-        }
-        return credential
-      }
-
-      return response.data
-    }
-    catch (error) {
-      if (isAxiosError(error) && error.response) {
-        this.logger.error(
-          `Error getting access token: ${error.response.status} - ${JSON.stringify(error.response.data)}`,
-        )
-      }
-      this.logger.error(`Failed to get access token: ${getErrorMessage(error)}`)
-      return null
-    }
   }
 
   async getOAuth2TaskInfo(state: string) {
@@ -699,9 +458,10 @@ export class MetaService {
         authTaskInfo.platform,
       )
       if (!userProfile) {
+        this.logger.error(`Failed to fetch user profile for platform: ${authTaskInfo.platform}`)
         return {
           status: 0,
-          message: 'get user profile failed',
+          message: '获取用户信息失败 (Failed to fetch user profile)',
         }
       }
       userProfile['groupId'] = authTaskInfo.spaceId
@@ -721,7 +481,7 @@ export class MetaService {
           return {
             status: 0,
             message:
-              'No Facebook pages found for the user. Please ensure you have at least one Facebook Page and the necessary permissions.',
+              '未找到相关的 Facebook 公共主页。请确保您的账户下至少有一个公共主页，并且已授予必要的权限。 (No Facebook pages found. Please ensure you have at least one Page and granted permissions.)',
           }
         }
         if (pageAccounts.length > 0) {

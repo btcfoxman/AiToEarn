@@ -12,6 +12,7 @@ export const cloudflareQueueConfigSchema = z.object({
 
 const s3AssetsConfigSchema = z.looseObject({
   ...s3ConfigSchema.shape,
+  maxSize: z.number().positive().optional(),
   provider: z.literal('s3'),
   publicEndpoint: z.string().optional(),
   cloudflare: cloudflareQueueConfigSchema.optional(),
@@ -19,6 +20,7 @@ const s3AssetsConfigSchema = z.looseObject({
 
 const aliOssAssetsConfigSchema = z.looseObject({
   ...aliOssConfigSchema.shape,
+  maxSize: z.number().positive().optional(),
   provider: z.literal('ali-oss'),
   publicEndpoint: z.string().optional(),
   callbackUrl: z.string().optional().describe('OSS 上传完成回调 URL'),

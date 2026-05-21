@@ -13,7 +13,7 @@ English | [简体中文](README.md) | [日本語](README_JA.md)
 AiToEarn helps OPCs (One-Person Companies), creators, brands, and businesses build, distribute, and monetize content with **AI-powered automation** across the world's most popular platforms.
 
 Supported Channels:
-Douyin, Xiaohongshu (Rednote), Kuaishou, Bilibili, TikTok, YouTube, Facebook, Instagram, Threads, Twitter (X), Pinterest, LinkedIn
+Douyin, Xiaohongshu (Rednote), Kuaishou, Bilibili, WeChat Channels, WeChat Official Accounts, TikTok, YouTube, Facebook, Instagram, Threads, Twitter (X), Pinterest, LinkedIn
 
 ## 🚀 Quick Start with AiToEarn (5 Ways)
 
@@ -29,6 +29,7 @@ Douyin, Xiaohongshu (Rednote), Kuaishou, Bilibili, TikTok, YouTube, Facebook, In
 
 ## What's New
 
+- **2026-05-21**: [2.4 version](https://github.com/yikart/AiToEarn/releases/tag/v2.4.0) — Draft generation now supports HappyHorse 1.0 and Seedance 2.0, with improved batch video/image-text draft generation, multi-model selection, reference images/videos, target-platform limits, and caption prompts; refreshed interface style and enhanced Twitter/X exploration and engagement.
 - **2026-04-20**: OpenClaw now supports AiToEarn earning workflows, so you can receive and execute monetization tasks directly inside OpenClaw.
 - **2026-03-26**: [2.1 version](https://www.aitoearn.ai/) — Content marketplace launched; added OpenClaw support for using AiToEarn directly within OpenClaw; added MCP protocol support for using AiToEarn in Claude, Cursor, and any MCP-compatible Agent or LLM.
 - **2026-02-07**: [1.8.0 version](https://www.aitoearn.ai/) — Added offline business promotion solutions for restaurants, retail stores, hotels, beauty salons, gyms, and more.
@@ -80,7 +81,7 @@ Creators can sell content on the platform to complete brand promotion tasks. All
 
 Distribute content to 10+ major platforms worldwide with one click — no more manual posting on each platform.
 
-- **Multi-Platform Distribution**: Douyin, Kwai, Bilibili, Rednote, TikTok, YouTube, Facebook, Instagram, Threads, X (Twitter), Pinterest, LinkedIn
+- **Multi-Platform Distribution**: Douyin, Kwai, Bilibili, Rednote, WeChat Channels, WeChat Official Accounts, TikTok, YouTube, Facebook, Instagram, Threads, X (Twitter), Pinterest, LinkedIn
 - **Calendar Scheduler**: Plan and coordinate content publishing across all platforms like a calendar
 
 <img src="presentation/publish-cn.png" width="30%"> <img src="presentation/channel-cn.png" width="30%">
@@ -163,7 +164,7 @@ The simplest way — just open your browser:
 npx -y @aitoearn/openclaw-plugin-cli
 ```
 
-On first run, follow the prompts to complete the required selections and enter your API Key to finish setup.
+On first run, select the environment and enter your API Key. Make sure they match: China uses an API Key from `aitoearn.cn`, and international uses one from `aitoearn.ai`. A mismatch returns 401.
 
 After setup, you can receive and execute AiToEarn earning tasks directly inside OpenClaw:
 
@@ -176,6 +177,13 @@ After setup, you can receive and execute AiToEarn earning tasks directly inside 
 > Prerequisite: [Get an API Key](#get-api-key) first
 
 AiToEarn works with any MCP-compatible AI assistant. Here's how to configure the most popular ones:
+
+Choose the URL that matches your API Key. A mismatched environment and key returns 401:
+
+| Environment | MCP URL | SSE URL |
+|-------------|---------|---------|
+| China | `https://aitoearn.cn/api/unified/mcp` | `https://aitoearn.cn/api/unified/sse` |
+| International | `https://aitoearn.ai/api/unified/mcp` | `https://aitoearn.ai/api/unified/sse` |
 
 <details open>
 <summary><b>Claude Desktop</b></summary>
@@ -248,10 +256,12 @@ Open **[http://localhost:8080](http://localhost:8080)** and you're ready to go.
 
 Add to `docker-compose.yml` under `aitoearn-server` (see [How to Get an API Key](#get-api-key)):
 
+Choose `RELAY_SERVER_URL` based on where `RELAY_API_KEY` was created: use `https://aitoearn.cn/api` for China keys and `https://aitoearn.ai/api` for international keys. A mismatch returns 401.
+
 ```yaml
 RELAY_SERVER_URL: https://aitoearn.ai/api
 RELAY_API_KEY: your-api-key
-RELAY_CALLBACK_URL: http://127.0.0.1:8080/api/plat/relay-callback
+RELAY_CALLBACK_URL: http://localhost:8080/api/plat/relay-callback
 ```
 
 Then restart: `docker compose restart aitoearn-server`

@@ -5,6 +5,7 @@ export enum TaskStatus {
   Cancelled = 'cancelled',
   Succeeded = 'succeeded',
   Failed = 'failed',
+  Expired = 'expired',
 }
 
 // 内容类型枚举
@@ -22,12 +23,19 @@ export enum ImageRole {
   ReferenceImage = 'reference_image',
 }
 
+// 视频角色枚举
 export enum VideoRole {
   ReferenceVideo = 'reference_video',
 }
 
+// 音频角色枚举
 export enum AudioRole {
   ReferenceAudio = 'reference_audio',
+}
+
+// 工具类型枚举
+export enum ToolType {
+  WebSearch = 'web_search',
 }
 
 // 错误信息接口
@@ -44,13 +52,15 @@ export interface ImageUrl {
   url: string
 }
 
-export interface VideoUrl {
-  /** Video URL or asset ID for Seedance multimodal reference generation. */
+// 视频对象接口
+export interface VideoUrlObject {
+  /** 视频 URL 或素材 ID */
   url: string
 }
 
-export interface AudioUrl {
-  /** Audio URL, base64 audio, or asset ID for Seedance multimodal reference generation. */
+// 音频对象接口
+export interface AudioUrlObject {
+  /** 音频 URL、Base64 编码或素材 ID */
   url: string
 }
 
@@ -72,26 +82,28 @@ export interface ImageContent {
   role?: ImageRole
 }
 
-export interface VideoUrlContent {
-  /** Input content type, should be video_url. */
+// 视频内容接口
+export interface VideoReferenceContent {
+  /** 输入内容的类型，此处应为video_url */
   type: ContentType.VideoUrl
-  /** Video reference object. */
-  video_url: VideoUrl
-  /** Video role. Currently only reference_video is supported. */
+  /** 输入给模型的视频对象 */
+  video_url: VideoUrlObject
+  /** 视频的位置或用途。当前仅支持参考视频 */
   role: VideoRole
 }
 
-export interface AudioUrlContent {
-  /** Input content type, should be audio_url. */
+// 音频内容接口
+export interface AudioReferenceContent {
+  /** 输入内容的类型，此处应为audio_url */
   type: ContentType.AudioUrl
-  /** Audio reference object. */
-  audio_url: AudioUrl
-  /** Audio role. Currently only reference_audio is supported. */
+  /** 输入给模型的音频对象 */
+  audio_url: AudioUrlObject
+  /** 音频的位置或用途。当前仅支持参考音频 */
   role: AudioRole
 }
 
 // 内容联合类型
-export type Content = TextContent | ImageContent | VideoUrlContent | AudioUrlContent
+export type Content = TextContent | ImageContent | VideoReferenceContent | AudioReferenceContent
 
 // 视频内容接口
 export interface VideoContent {
@@ -101,22 +113,34 @@ export interface VideoContent {
   last_frame_url?: string
 }
 
+// 工具配置接口
+export interface Tool {
+  type: ToolType
+}
+
+// 工具使用量统计
+export interface ToolUsage {
+  web_search?: number
+}
+
 // 使用量统计接口
 export interface Usage {
   /** 模型生成的token数量 */
   completion_tokens: number
   /** 视频生成模型不统计输入token，输入token为0，故total_tokens=completion_tokens */
   total_tokens: number
+  /** 工具使用情况 */
+  tool_usage?: ToolUsage
 }
 
 // 创建视频生成任务请求接口
 export interface CreateVideoGenerationTaskRequest {
   /** 您需要调用的模型的ID（Model ID）或Endpoint ID */
   model: string
-  /** OpenAI-compatible gateways require a top-level prompt field. Official Ark can keep using content text. */
-  prompt?: string
-  /** 输入给模型，生成视频的信息，支持文本信息和图片信息 */
+  /** 输入给模型，生成视频的信息 */
   content: Content[]
+  /** OpenAI-compatible gateways require a top-level prompt field. */
+  prompt?: string
   /** Compatibility mode, such as t2v, i2v, i2v_first_last, reference_images, or reference_material. */
   mode?: string
   /** Alias for mode used by some OpenAI-compatible gateways. */
@@ -131,28 +155,36 @@ export interface CreateVideoGenerationTaskRequest {
   end_image_url?: string
   /** Last frame image alias used by OpenAI-compatible gateways. */
   last_image_url?: string
-  /** Output aspect ratio, such as 16:9 or 9:16. */
-  ratio?: Ratio
   /** Alias for ratio used by OpenAI-compatible gateways. */
   aspect_ratio?: Ratio
-  /** Video duration in seconds. */
-  duration?: number
   /** Alias for duration used by OpenAI-compatible gateways. */
   seconds?: number
-  /** Output resolution such as 720p or 1080p. */
-  resolution?: Resolution
-  /** Frame rate. */
+  /** Frame rate used by OpenAI-compatible gateways. */
   fps?: number
-  /** Random seed used by supported gateways. */
-  seed?: number
-  /** Whether to generate audio. */
-  generate_audio?: boolean
-  /** Whether to add a watermark. */
-  watermark?: boolean
   /** 填写本次生成任务结果的回调通知地址。当视频生成任务有状态变化时，方舟将向此地址推送POST请求 */
   callback_url?: string
-  /** 是否返回生成视频的尾帧图像。默认值false */
+  /** 是否返回生成视频的尾帧图像 */
   return_last_frame?: boolean
+  /** 视频分辨率 */
+  resolution?: Resolution
+  /** 生成视频的宽高比 */
+  ratio?: Ratio
+  /** 生成视频时长 */
+  duration?: number
+  /** 种子值 */
+  seed?: number
+  /** 是否包含水印 */
+  watermark?: boolean
+  /** 模型要使用的工具 */
+  tools?: Tool[]
+  /** 是否生成音频 */
+  generate_audio?: boolean
+  /** 服务等级 */
+  service_tier?: 'default' | 'flex'
+  /** 超时时间（秒） */
+  execution_expires_after?: number
+  /** 终端用户标识 */
+  safety_identifier?: string
 }
 
 // 创建视频生成任务响应接口
@@ -209,8 +241,14 @@ export type Ratio
 
 // 支持的模型
 export type VideoModel
-  = | 'doubao-seedance-2-0-260128'
-    | 'doubao-seedance-2-0-fast-260128'
+  = | 'doubao-seedance-pro'
+    | 'doubao-seedance-2-0-250428'
+    | 'doubao-seedance-2-0-fast-250428'
+    | 'doubao-seedance-1-0-lite-t2v'
+    | 'doubao-seedance-1-0-lite-i2v'
+    | 'wan2-1-14b-t2v'
+    | 'wan2-1-14b-i2v'
+    | 'wan2-1-14b-flf2v'
     | string
 
 // ========== 视频点播 (VOD) 相关接口 ==========

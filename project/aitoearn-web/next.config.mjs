@@ -2,6 +2,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const publicAssetsVersion = '20260517'
+const publicAssetsCacheControl = 'public, max-age=0, must-revalidate'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -36,24 +38,42 @@ const nextConfig = {
     const apiProxyUrl = process.env.API_PROXY_URL || (isDev ? 'http://127.0.0.1:3002' : '')
     const aiApiProxyUrl = process.env.AI_API_PROXY_URL || (isDev ? 'http://127.0.0.1:3010' : '')
 
-    if (aiApiProxyUrl) {
-      rewrites.push({
-        source: '/api/ai/:path*',
-        destination: `${aiApiProxyUrl}/ai/:path*`,
-      })
-      rewrites.push({
-        source: '/api/agent/:path*',
-        destination: `${aiApiProxyUrl}/agent/:path*`,
-      })
-    }
-
-    if (apiProxyUrl) {
+    if (process.env.NEXT_PUBLIC_PROXY_URL) {
       rewrites.push({
         source: '/api/:path*',
-        destination: `${apiProxyUrl}/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_PROXY_URL}/api/:path*`,
       })
     }
+    else {
+      if (aiApiProxyUrl) {
+        rewrites.push({
+          source: '/api/ai/:path*',
+          destination: `${aiApiProxyUrl}/ai/:path*`,
+        })
+        rewrites.push({
+          source: '/api/agent/:path*',
+          destination: `${aiApiProxyUrl}/agent/:path*`,
+        })
+      }
+
+      if (apiProxyUrl) {
+        rewrites.push({
+          source: '/api/:path*',
+          destination: `${apiProxyUrl}/:path*`,
+        })
+      }
+    }
     return rewrites
+  },
+  redirects: async () => {
+    return [
+      {
+        source: '/assets/:path*',
+        missing: [{ type: 'query', key: 'v' }],
+        destination: `/assets/:path*?v=${publicAssetsVersion}`,
+        permanent: false,
+      },
+    ]
   },
 }
 
@@ -79,6 +99,15 @@ nextConfig.headers = async () => {
     {
       source: '/api/:path*',
       headers: CorsHeaders,
+    },
+    {
+      source: '/assets/:path*',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: publicAssetsCacheControl,
+        },
+      ],
     },
     {
       // 为所有页面添加 SEO 相关的 headers
