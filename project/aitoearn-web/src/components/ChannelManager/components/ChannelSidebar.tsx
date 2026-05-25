@@ -5,12 +5,11 @@
 
 'use client'
 
-import type { PlatType } from '@/app/config/platConfig'
 import { Layers, Plus, Puzzle } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { AccountPlatInfoArr, AccountPlatInfoMap } from '@/app/config/platConfig'
+import { AccountPlatInfoArr, AccountPlatInfoMap, PlatType } from '@/app/config/platConfig'
 import { useTransClient } from '@/app/i18n/client'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -83,6 +82,10 @@ export function ChannelSidebar() {
       setSelectedPlatform(platform)
     }
     else {
+      if (platform === PlatType.Toutiao) {
+        setCurrentView('connect-list')
+        return
+      }
       // 无账号：进入授权流程
       const defaultSpace = accountGroupList.find(g => g.isDefault)
       if (defaultSpace) {

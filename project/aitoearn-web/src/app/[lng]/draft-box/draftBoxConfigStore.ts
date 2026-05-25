@@ -117,6 +117,10 @@ function normalizePersistedMedias(params: MaterialGenerationParams): IPersistedM
 }
 
 function inferContentType(params: MaterialGenerationParams, current: DraftBoxConfig): DraftContentType {
+  if (params.draftType === 'article') {
+    return 'article'
+  }
+
   if (params.imageModel || params.imageCount || params.imageSize) {
     return 'image_text'
   }

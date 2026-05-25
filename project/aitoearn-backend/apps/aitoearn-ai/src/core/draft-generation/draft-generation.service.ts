@@ -27,12 +27,14 @@ import { ImageService } from '../ai/image/image.service'
 import { calculatePricingPoints, ChatPricing } from '../ai/pricing/pricing-calculator'
 import { VideoService } from '../ai/video/video.service'
 import { DraftGenerationMemoryService } from './draft-generation-memory.service'
-import { DraftGenerationPlannerService, ImageTextDraftPlanResult, VideoDraftPlanResult } from './draft-generation-planner.service'
+import { ArticleDraftPlanResult, DraftGenerationPlannerService, ImageTextDraftPlanResult, VideoDraftPlanResult } from './draft-generation-planner.service'
 import { getCompatibleAccountTypes } from './draft-generation-platforms'
 import {
   CreateDraftFromVideoUrlDto,
+  CreateArticleDraftDto,
   CreateDraftGenerationV2Dto,
   CreateImageTextDraftDto,
+  ArticleDraftType,
   DraftGenerationMemoryContentType,
   DraftType,
   ImageTextDraftType,
@@ -130,6 +132,15 @@ interface ImageTextDraftResponse {
   generatedImageCount?: number
   imageGenerationErrors?: ImageGenerationErrorDetail[]
   plan?: ImageTextDraftPlanResult
+}
+
+interface ArticleDraftResponse {
+  materialId?: string
+  title?: string
+  description?: string
+  topics?: string[]
+  articleHtml?: string
+  plan?: ArticleDraftPlanResult
 }
 
 @Injectable()
@@ -465,6 +476,61 @@ export class DraftGenerationService {
     return aiLogIds
   }
 
+  async createArticleDrafts(userId: string, userType: UserType, dto: CreateArticleDraftDto): Promise<string[]> {
+    const resolvedGroupId = await this.resolveDraftGroupId(userId, dto.groupId)
+    const draftType = dto.draftType ?? 'article'
+    const plannerModel = dto.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+    const plannerModelConfig = config.ai.models.chat.find(model => model.name === plannerModel && model.scenes?.includes('draft-generation'))
+    if (!plannerModelConfig) {
+      throw new AppException(ResponseCode.InvalidModel)
+    }
+    await this.assertUserCreditsSufficient(userId, userType, 0)
+
+    const quantity = dto.quantity ?? 1
+    const aiLogIds: string[] = []
+
+    for (let i = 0; i < quantity; i++) {
+      const aiLog = await this.aiLogRepository.create({
+        userId,
+        userType,
+        type: AiLogType.DraftGeneration,
+        model: plannerModelConfig.name,
+        channel: plannerModelConfig.channel as AiLogChannel,
+        status: AiLogStatus.Generating,
+        startedAt: new Date(),
+        points: 0,
+        request: {
+          groupId: resolvedGroupId,
+          version: 'v2-article',
+          prompt: dto.prompt,
+          captionPrompt: dto.captionPrompt,
+          draftType,
+          platforms: dto.platforms,
+          plannerModel,
+        },
+        response: {},
+      })
+
+      await this.addDraftGenerationJob({
+        aiLogId: aiLog.id,
+        userId,
+        userType,
+        groupId: resolvedGroupId,
+        version: 'v2-article',
+        prompt: dto.prompt,
+        captionPrompt: dto.captionPrompt,
+        articleDraftType: draftType,
+        platforms: dto.platforms,
+        plannerModel,
+        disableMemory: dto.disableMemory,
+      })
+
+      aiLogIds.push(aiLog.id)
+    }
+
+    return aiLogIds
+  }
+
   /**
    * V2: 固定管线执行草稿内容生成（由 Consumer 调用）
    *
@@ -476,6 +542,119 @@ export class DraftGenerationService {
    *
    * 积分由 ChatService 和各 VideoService 内部自动扣除
    */
+  async generateContentArticle(
+    aiLogId: string,
+    userId: string,
+    userType: UserType,
+    groupId: string,
+    options: {
+      prompt: string
+      captionPrompt?: string
+      draftType?: ArticleDraftType
+      platforms?: string[]
+      plannerModel?: string
+      disableMemory?: boolean
+    },
+  ): Promise<{ consumedPoints: number }> {
+    const existingAiLog = await this.aiLogRepository.getById(aiLogId)
+    const existing = (existingAiLog?.response ?? {}) as ArticleDraftResponse
+    const consumedPoints = existingAiLog?.points ?? 0
+    const startTime = Date.now()
+    const draftType = options.draftType ?? 'article'
+    let resolvedPlannerModel = existingAiLog?.model ?? options.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+
+    try {
+      let plan = existing.plan
+      if (plan) {
+        this.logger.log({ aiLogId }, 'Article: Reusing plan from previous attempt')
+      }
+      else {
+        const memoryItems = options.disableMemory
+          ? []
+          : (await this.draftGenerationMemoryService.getPlannerMemoryContext(userId, DraftGenerationMemoryContentType.ImageText)).memoryItems
+        const planned = await this.draftGenerationPlannerService.planArticle({
+          userId,
+          contentType: DraftGenerationMemoryContentType.ImageText,
+          plannerModel: options.plannerModel,
+          userPrompt: options.prompt,
+          captionPrompt: options.captionPrompt,
+          memoryItems,
+          platforms: options.platforms,
+        })
+        plan = planned.plan
+        resolvedPlannerModel = planned.model
+
+        await this.aiLogRepository.updateById(aiLogId, {
+          $set: { 'response.plan': plan, 'request.plannerModel': planned.model },
+        })
+
+        this.logger.log(
+          { aiLogId, title: plan.title, plannerModel: planned.model },
+          'Article: Planning completed',
+        )
+      }
+
+      const materialId = existing.materialId ?? (await this.materialRepository.create({
+        userId,
+        userType,
+        groupId,
+        type: MaterialType.ARTICLE,
+        source: MaterialSource.PlaceDraft,
+        status: MaterialStatus.SUCCESS,
+        title: plan.title,
+        desc: plan.description,
+        topics: plan.topics,
+        mediaList: [],
+        useCount: 0,
+        autoDeleteMedia: false,
+        model: resolvedPlannerModel,
+        option: {
+          articleHtml: plan.articleHtml,
+        },
+        generationParams: {
+          draftType,
+          ...options,
+        },
+        accountTypes: (options.platforms as AccountType[]) ?? getCompatibleAccountTypes({
+          type: 'article',
+          title: plan.title,
+          desc: plan.description,
+          topics: plan.topics,
+          imageCount: 0,
+        }),
+      })).id
+
+      const response: ArticleDraftResponse = {
+        materialId,
+        title: plan.title,
+        description: plan.description,
+        topics: plan.topics,
+        articleHtml: plan.articleHtml,
+        plan,
+      }
+
+      await this.aiLogRepository.updateById(aiLogId, {
+        $set: {
+          status: AiLogStatus.Success,
+          model: resolvedPlannerModel,
+          points: consumedPoints,
+          duration: Date.now() - startTime,
+          response,
+        },
+      })
+
+      return { consumedPoints }
+    }
+    catch (error) {
+      this.logger.error(error, `v2 generateContentArticle failed aiLogId=${aiLogId}, userId=${userId}, groupId=${groupId}, consumedPoints=${consumedPoints}`)
+      throw new DraftGenerationError(
+        getErrorMessage(error),
+        consumedPoints,
+        error,
+      )
+    }
+  }
+
   async generateContentV2(
     aiLogId: string,
     userId: string,

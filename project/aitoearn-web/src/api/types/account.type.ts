@@ -28,6 +28,17 @@ export interface SocialAccount {
   rank: number
   groupId: string
   clientType?: ClientType
+  externalProvider?: string
+  externalId?: string
+  externalPlatform?: string
+  externalMeta?: {
+    capabilities?: {
+      contentTypes?: Array<'image_text' | 'article' | 'weitoutiao'>
+    }
+    publishTargetId?: string
+    targetSnapshot?: Record<string, unknown>
+    [key: string]: unknown
+  }
 }
 
 // 更新账户统计数据

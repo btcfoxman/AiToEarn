@@ -148,6 +148,7 @@ const ToolBarInline = memo(
     const { t } = useTransClient(['brandPromotion', 'route'])
 
     const isVideoMode = contentType === 'video'
+    const isArticleMode = contentType === 'article'
 
     const imageCountLabel = isDraftMode
       ? t('detail.imageTextDraftImageCount')
@@ -271,7 +272,7 @@ const ToolBarInline = memo(
                 <Image className="h-3.5 w-3.5" />
               )}
               {isDraftMode
-                ? `${t('detail.draftModeOn')}(${isVideoMode ? t('detail.contentTypeVideo') : t('detail.contentTypeImageText')})`
+                ? `${t('detail.draftModeOn')}(${isVideoMode ? t('detail.contentTypeVideo') : isArticleMode ? 'Article' : t('detail.contentTypeImageText')})`
                 : isVideoMode
                   ? t('detail.draftModeOffVideo')
                   : t('detail.draftModeOffImage')}
@@ -294,6 +295,13 @@ const ToolBarInline = memo(
                   icon: FileText,
                   isDraft: true,
                   ct: 'video' as const,
+                },
+                {
+                  key: 'draft_article',
+                  label: `${t('detail.draftModeOn')}(Article)`,
+                  icon: FileText,
+                  isDraft: true,
+                  ct: 'article' as const,
                 },
               ].map(({ key, label, icon: Icon, isDraft, ct }) => {
                 const isActive = isDraftMode && contentType === ct
@@ -379,6 +387,7 @@ const ToolBarInline = memo(
         )}
 
         {/* 模型选择 pill */}
+        {!isArticleMode && (
         <Popover open={modelPopover.open} onOpenChange={modelPopover.onOpenChange}>
           <PopoverTrigger asChild>
             <button
@@ -557,9 +566,10 @@ const ToolBarInline = memo(
             )}
           </PopoverContent>
         </Popover>
+        )}
 
         {/* 图文模式：分辨率选择 pill */}
-        {!isVideoMode && imagePricing.length > 0 && (
+        {contentType === 'image_text' && imagePricing.length > 0 && (
           <Popover open={imageSizePopover.open} onOpenChange={imageSizePopover.onOpenChange}>
             <PopoverTrigger asChild>
               <button data-testid="draftbox-ai-resolution" type="button" className={pillClass}>
@@ -640,7 +650,7 @@ const ToolBarInline = memo(
         )}
 
         {/* 比例选择 pill */}
-        {isVideoEditMode ? (
+        {!isArticleMode && (isVideoEditMode ? (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -698,7 +708,7 @@ const ToolBarInline = memo(
               </div>
             </PopoverContent>
           </Popover>
-        )}
+        ))}
 
         {/* 视频模式：时长 pill */}
         {isVideoMode
@@ -757,7 +767,7 @@ const ToolBarInline = memo(
           ))}
 
         {/* 图文模式：图片数量 pill */}
-        {!isVideoMode && (
+        {contentType === 'image_text' && (
           <Popover open={imageCountPopover.open} onOpenChange={imageCountPopover.onOpenChange}>
             <PopoverTrigger asChild>
               <button data-testid="draftbox-ai-image-count" type="button" className={pillClass}>
@@ -852,7 +862,7 @@ const ToolBarInline = memo(
           <div className="flex items-center gap-1.5">
             <Coins className="h-4 w-4 text-amber-500" />
             <span className="text-sm font-medium text-foreground">
-              {!isVideoMode && isPricingLoading ? '--' : totalCredits}
+              {contentType === 'image_text' && isPricingLoading ? '--' : totalCredits}
             </span>
             <button
               data-testid="draftbox-ai-submit-btn"

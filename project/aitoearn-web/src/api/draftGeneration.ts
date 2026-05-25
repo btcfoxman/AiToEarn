@@ -30,6 +30,7 @@ export interface DraftGenerationResponse {
   requestedImageCount?: number
   generatedImageCount?: number
   imageGenerationErrors?: Array<Record<string, unknown>>
+  articleHtml?: string
   plan?: Record<string, unknown>
 }
 
@@ -48,7 +49,7 @@ export interface DraftGenerationRequest {
   imageCount?: number
   imageSize?: string
   platforms?: PlatType[]
-  draftType?: VideoDraftType | ImageTextDraftType
+  draftType?: VideoDraftType | ImageTextDraftType | ArticleDraftType
 }
 
 /** 生成任务详情 */
@@ -91,13 +92,15 @@ export type VideoModelType = string
 export type ImageModelType = string
 
 /** 草稿内容类型 */
-export type DraftContentType = 'video' | 'image_text'
+export type DraftContentType = 'video' | 'image_text' | 'article'
 
 /** 视频草稿类型：draft=完整草稿（含标题描述话题），video=仅生成视频 */
 export type VideoDraftType = 'draft' | 'video'
 
 /** 图文草稿类型：draft=完整草稿，image=仅生成图片 */
 export type ImageTextDraftType = 'draft' | 'image'
+
+export type ArticleDraftType = 'article'
 
 /** 创建 AI 批量生成草稿任务 */
 export function apiCreateDraftGeneration(data: {
@@ -132,6 +135,17 @@ export function apiCreateImageTextDraft(data: {
   draftType?: ImageTextDraftType
 }) {
   return http.post<CreateDraftGenerationVo>('ai/draft-generation/image-text', data)
+}
+
+export function apiCreateArticleDraft(data: {
+  quantity: number
+  groupId: string
+  prompt: string
+  captionPrompt?: string
+  platforms?: PlatType[]
+  draftType?: ArticleDraftType
+}) {
+  return http.post<CreateDraftGenerationVo>('ai/draft-generation/article', data)
 }
 
 /** 获取图片模型定价信息 */

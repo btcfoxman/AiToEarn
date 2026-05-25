@@ -32,7 +32,48 @@ vi.doMock('@yikart/mongodb', () => ({
   PublishRecordSource: MockPublishRecordSource,
 }))
 
-const { createPublishRecordSchema } = await import('./publish.dto')
+const { CreatePublishSchema, createPublishRecordSchema } = await import('./publish.dto')
+
+describe('CreatePublishSchema', () => {
+  it('keeps orchestration publish options for mobile publishing', () => {
+    const result = CreatePublishSchema.safeParse({
+      accountId: 'acc_wxgzh',
+      accountType: 'wxGzh',
+      type: 'article',
+      title: 'title',
+      desc: 'body',
+      publishTime: '2026-05-26T08:00:00Z',
+      topics: [],
+      option: {
+        orchestration: {
+          publishTargetId: 'pt_account_1',
+          contentType: 'image_text',
+          params: {
+            insert_video_channel: true,
+            video_channel_keyword: 'video keyword',
+            insert_poll: true,
+            poll_question: 'Question?',
+            poll_options: ['A', 'B'],
+          },
+        },
+      },
+    })
+
+    if (!result.success)
+      throw result.error
+    expect(result.data.option?.orchestration).toEqual({
+      publishTargetId: 'pt_account_1',
+      contentType: 'image_text',
+      params: {
+        insert_video_channel: true,
+        video_channel_keyword: 'video keyword',
+        insert_poll: true,
+        poll_question: 'Question?',
+        poll_options: ['A', 'B'],
+      },
+    })
+  })
+})
 
 describe('createPublishRecordSchema', () => {
   it('allows native published XHS records without platform option', () => {

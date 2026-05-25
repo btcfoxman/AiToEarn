@@ -21,6 +21,7 @@ const PLATFORM_LIMIT_RULES: Record<string, PlatformLimitRule> = {
   [AccountType.PINTEREST]: { titleRequired: true },
   [AccountType.KWAI]: { topicsMaxCount: 4 },
   [AccountType.Xhs]: { descMaxLength: 1000 },
+  [AccountType.Toutiao]: { titleMaxLength: 30, titleRequired: true, descMaxLength: 10000, descRequired: true, topicsMaxCount: 5 },
   [AccountType.LINKEDIN]: { titleMaxLength: 200, descMaxLength: 3000 },
 }
 
@@ -104,6 +105,9 @@ const PLATFORM_MEDIA_CONSTRAINTS: Partial<Record<AccountType, PlatformMediaConst
   },
   [AccountType.WxGzh]: {
     image: {},
+  },
+  [AccountType.Toutiao]: {
+    image: { maxCount: 9 },
   },
   [AccountType.WxSph]: {
     video: {},

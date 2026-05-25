@@ -7,6 +7,8 @@ import { DraftGenerationMemoryService } from './draft-generation-memory.service'
 import {
   CreateDraftFromVideoUrlDto,
   CreateDraftFromVideoUrlDtoSchema,
+  CreateArticleDraftDto,
+  CreateArticleDraftDtoSchema,
   CreateDraftGenerationV2Dto,
   CreateDraftGenerationV2DtoSchema,
   CreateImageTextDraftDto,
@@ -186,6 +188,22 @@ export class DraftGenerationController {
     @Body() body: CreateImageTextDraftDto,
   ): Promise<CreateDraftGenerationVo> {
     const taskIds = await this.draftGenerationService.createImageTextDrafts(token.id, UserType.User, body)
+    await this.metricEventHelperService.record(token.id, MetricEventName.contentManagementAiGenerate)
+    return CreateDraftGenerationVo.create({ taskIds })
+  }
+
+  @ApiDoc({
+    summary: 'ç”Ÿæˆæ–‡ç« å†…å®¹è‰ç¨¿',
+    description: 'ä½¿ç”¨ AI ç”Ÿæˆçº¯æ–‡ç« è‰ç¨¿ï¼Œä¿å­˜ä¸º ARTICLE ç´ æï¼Œç”¨äºŽå¾®ä¿¡å…¬ä¼—å·å’Œä»Šæ—¥å¤´æ¡å‘å¸ƒã€‚',
+    body: CreateArticleDraftDtoSchema,
+    response: CreateDraftGenerationVo,
+  })
+  @Post('/article')
+  async createArticleDrafts(
+    @GetToken() token: TokenInfo,
+    @Body() body: CreateArticleDraftDto,
+  ): Promise<CreateDraftGenerationVo> {
+    const taskIds = await this.draftGenerationService.createArticleDrafts(token.id, UserType.User, body)
     await this.metricEventHelperService.record(token.id, MetricEventName.contentManagementAiGenerate)
     return CreateDraftGenerationVo.create({ taskIds })
   }

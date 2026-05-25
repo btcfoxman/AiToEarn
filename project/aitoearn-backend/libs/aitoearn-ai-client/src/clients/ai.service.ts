@@ -7,6 +7,7 @@ import {
   ChatCompletionVo,
   ChatModelConfigVo,
   CreateDraftGenerationResponse,
+  CreateArticleDraftRequest,
   CreateDraftV2Request,
   CreateImageTextDraftRequest,
   DraftGenerationPricingResponse,
@@ -267,6 +268,15 @@ export class AiService extends BaseService {
 
   async createImageTextDraft(data: CreateImageTextDraftRequest): Promise<CreateDraftGenerationResponse> {
     const url = `/internal/ai/draft-generation/image-text`
+    const config: AxiosRequestConfig = {
+      method: 'POST',
+      data,
+    }
+    return this.request<CreateDraftGenerationResponse>(url, config)
+  }
+
+  async createArticleDraft(data: CreateArticleDraftRequest): Promise<CreateDraftGenerationResponse> {
+    const url = `/internal/ai/draft-generation/article`
     const config: AxiosRequestConfig = {
       method: 'POST',
       data,

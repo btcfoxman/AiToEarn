@@ -68,7 +68,14 @@ export interface IXhsUserDeclarationBind {
 }
 
 // 发布 每个平台的独有参数
+export type OrchestrationPublishContentType = 'image_text' | 'article' | 'weitoutiao'
+
 export interface IPlatOption {
+  orchestration?: {
+    contentType?: OrchestrationPublishContentType
+    publishTargetId?: string
+    params?: Record<string, unknown>
+  }
   bilibili?: {
     // 分区ID，由获取分区信息接口得到
     tid?: number

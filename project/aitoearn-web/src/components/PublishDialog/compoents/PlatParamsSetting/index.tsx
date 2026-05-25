@@ -16,6 +16,7 @@ import KwaiParams from '@/components/PublishDialog/compoents/PlatParamsSetting/p
 import PinterestParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/PinterestParams'
 import ThreadsParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/ThreadsParams'
 import TikTokParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/TikTokParams'
+import ToutiaoParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/ToutiaoParams'
 import WxGzhParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/WxGzhParams'
 import YouTubeParams from '@/components/PublishDialog/compoents/PlatParamsSetting/plats/YouTubeParams'
 import { usePublishDialog } from '@/components/PublishDialog/usePublishDialog'
@@ -67,6 +68,10 @@ const PlatParamsSetting = memo(
           case PlatType.WxGzh:
             return (
               <WxGzhParams pubItem={pubItem} onImageToImage={onImageToImage} isMobile={isMobile} />
+            )
+          case PlatType.Toutiao:
+            return (
+              <ToutiaoParams pubItem={pubItem} onImageToImage={onImageToImage} isMobile={isMobile} />
             )
           case PlatType.Facebook:
             return (

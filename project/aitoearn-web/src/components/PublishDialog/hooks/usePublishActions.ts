@@ -81,6 +81,36 @@ function normalizePublishOption(item: PubItem) {
     }
   }
 
+  if (item.account.externalProvider === 'ai-orchestration') {
+    const supportedContentTypes = item.account.externalMeta?.capabilities?.contentTypes ?? []
+    const requestedContentType = option.orchestration?.contentType
+    let contentType = requestedContentType
+
+    if (!contentType || !supportedContentTypes.includes(contentType)) {
+      if (
+        item.account.type === PlatType.WxGzh
+        && item.params.images?.length
+        && supportedContentTypes.includes('image_text')
+      ) {
+        contentType = 'image_text'
+      }
+      else if (item.account.type === PlatType.Toutiao && supportedContentTypes.includes('article')) {
+        contentType = 'article'
+      }
+      else {
+        contentType = supportedContentTypes.includes('article')
+          ? 'article'
+          : supportedContentTypes[0]
+      }
+    }
+
+    option.orchestration = {
+      ...option.orchestration,
+      publishTargetId: item.account.externalId || item.account.uid,
+      contentType,
+    }
+  }
+
   return option
 }
 

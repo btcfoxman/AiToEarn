@@ -208,10 +208,12 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     isGeneratingBatch,
     createBatchGenerationWithModels,
     createImageTextBatchGenerationWithModels,
+    createArticleBatchGeneration,
   } = usePlanDetailStore(useShallow(state => ({
     isGeneratingBatch: state.isGeneratingBatch,
     createBatchGenerationWithModels: state.createBatchGenerationWithModels,
     createImageTextBatchGenerationWithModels: state.createImageTextBatchGenerationWithModels,
+    createArticleBatchGeneration: state.createArticleBatchGeneration,
   })))
 
   // 默认提示词（基于品牌名称和位置）
@@ -582,6 +584,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
 
   // 是否为视频编辑模式（上传了视频 + 视频内容类型）
   const isVideoEditMode = hasVideos && contentType === 'video'
+  const isArticleMode = contentType === 'article'
 
   // 图文非草稿模式不展示数量控件，提交时固定为 1，避免与草稿模式 quantity 串用
   const effectiveQuantity = useMemo(() => {
@@ -606,7 +609,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     return Math.ceil(pricePerImage * imageCount * effectiveQuantity * 100) / 100
   }, [effectiveQuantity, imageCount, imagePricing, imageSize])
 
-  const totalCredits = contentType === 'video' ? videoCredits : imageTextCredits
+  const totalCredits = contentType === 'video' ? videoCredits : isArticleMode ? 0 : imageTextCredits
 
   // hasVideos 变化时自动 clamp duration（video2video 最大 duration 可能更小）
   useEffect(() => {
@@ -1031,7 +1034,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
         updateConfig(configKey, { aspectRatio: defaultRatio })
       }
     }
-    else {
+    else if (ct === 'video') {
       const supported = currentVideoModelConfig.supportedRatios
       if (!includesOption([...supported], aspectRatio)) {
         const defaultRatio = supported.has('9:16') ? '9:16' : ([...supported][0] ?? '9:16')
@@ -1041,7 +1044,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     }
     const maxImages = ct === 'image_text'
       ? currentImageMaxInputImages
-      : currentVideoModelConfig.maxImages
+      : ct === 'video' ? currentVideoModelConfig.maxImages : 0
     const maxVideos = ct === 'video' ? currentVideoModelConfig.maxVideos : 0
     const nextLocalImages = localMedias.filter(m => m.type === 'image')
     const nextLocalVideos = ct === 'video' ? localMedias.filter(m => m.type === 'video').slice(0, maxVideos) : []
@@ -1337,7 +1340,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
 
     // 图文模式不支持视频上传，过滤掉视频文件
     const validVideoFiles: File[] = []
-    if (contentType === 'image_text') {
+    if (contentType !== 'video') {
       if (videoFiles.length > 0) {
         toast.warning(t('detail.videoNotSupported'))
       }
@@ -1471,7 +1474,24 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
       ...localImages.filter(m => m.url).map(m => m.url),
     ]
 
-    if (contentType === 'image_text') {
+    if (contentType === 'article') {
+      const result = await createArticleBatchGeneration(
+        effectiveQuantity,
+        promptValue.trim(),
+        groupId,
+        effectiveSelectedPlatforms.length > 0 ? effectiveSelectedPlatforms : undefined,
+        'article',
+        captionPromptForSubmit || undefined,
+      )
+      if (result.success) {
+        toast.success(t('detail.imageTextGenerated'))
+        onGenerated?.()
+      }
+      else {
+        toast.error(result.errorMessage || t('detail.multiModelGenerateFailed'))
+      }
+    }
+    else if (contentType === 'image_text') {
       if (selectedImageModels.length === 0) {
         toast.warning(t('detail.selectModelRequired'))
         return
@@ -1546,7 +1566,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
         toast.error(result.errorMessage || t('detail.multiModelGenerateFailed'))
       }
     }
-  }, [promptValue, aspectRatio, duration, resolution, selectedImages, localImages, localVideos, effectiveQuantity, createBatchGenerationWithModels, createImageTextBatchGenerationWithModels, contentType, selectedImageModels, selectedVideoModels, currentImageAspectRatios.length, imagePricing.length, currentVideoModelConfig.supportedRatios, imageCount, isUploading, t, groupId, onGenerated, effectiveSelectedPlatforms, isDraftMode, captionPrompt, captionSystemPrompt])
+  }, [promptValue, aspectRatio, duration, resolution, selectedImages, localImages, localVideos, effectiveQuantity, createBatchGenerationWithModels, createImageTextBatchGenerationWithModels, createArticleBatchGeneration, contentType, selectedImageModels, selectedVideoModels, currentImageAspectRatios.length, imagePricing.length, currentVideoModelConfig.supportedRatios, imageCount, isUploading, t, groupId, onGenerated, effectiveSelectedPlatforms, isDraftMode, captionPrompt, captionSystemPrompt])
 
   // Prompts 探索页 URL（根据当前模型族切换 grok / seedance 提示词页）
   const promptsExploreUrl = useMemo(() => {
@@ -1571,7 +1591,9 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
   }, [t])
 
   // 上传能力判断
-  const maxUploadImages = contentType === 'image_text' ? currentImageMaxInputImages : currentVideoModelConfig.maxImages
+  const maxUploadImages = contentType === 'image_text'
+    ? currentImageMaxInputImages
+    : contentType === 'video' ? currentVideoModelConfig.maxImages : 0
   const canUploadImage = selectedIds.length + localImages.length < maxUploadImages
   const canUploadVideo = contentType === 'video' && currentVideoModelConfig.maxVideos > 0 && localVideos.length < currentVideoModelConfig.maxVideos
 
@@ -1590,7 +1612,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
             images={selectedImages}
             allImages={imageList}
             selectedIds={selectedIds}
-            maxImages={contentType === 'image_text' ? currentImageMaxInputImages : currentVideoModelConfig.maxImages}
+            maxImages={contentType === 'image_text' ? currentImageMaxInputImages : contentType === 'video' ? currentVideoModelConfig.maxImages : 0}
             onImagesChange={handleImagesChange}
             localMedias={localMedias}
             onLocalMediaRemove={handleLocalMediaRemove}

@@ -112,6 +112,14 @@ const PLATFORM_CONSTRAINTS: Partial<Record<PlatType, PlatformConstraint>> = {
     ],
     imagesMax: 4,
   },
+  wxGzh: {
+    videoCategories: [],
+    imagesMax: 10,
+  },
+  toutiao: {
+    videoCategories: [],
+    imagesMax: 9,
+  },
   linkedin: {
     videoCategories: [
       {
@@ -196,6 +204,7 @@ export function checkPlatformCompatibility(
   const result = new Map<PlatType, string[]>()
   const { contentType, aspectRatio, duration, imageCount } = params
   const isVideoMode = contentType === 'video'
+  const isArticleMode = contentType === 'article'
 
   for (const plat of availablePlatforms) {
     const reasons: string[] = []
@@ -293,6 +302,11 @@ export function checkPlatformCompatibility(
             }
           }
         }
+      }
+    }
+    else if (isArticleMode) {
+      if (!platInfo.pubTypes.has(PubType.Article) && !platInfo.pubTypes.has(PubType.Weitoutiao)) {
+        reasons.push(t('detail.platformIncompatible.contentTypeNotSupported'))
       }
     }
     else {

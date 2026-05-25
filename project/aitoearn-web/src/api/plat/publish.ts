@@ -14,7 +14,11 @@ function filterOptionByPlatform(option: IPlatOption, accountType: PlatType): IPl
   if (!option)
     return {}
   const key = accountType as keyof IPlatOption
-  return option[key] ? ({ [key]: option[key] } as IPlatOption) : {}
+  const filtered: IPlatOption = option[key] ? ({ [key]: option[key] } as IPlatOption) : {}
+  if (option.orchestration) {
+    filtered.orchestration = option.orchestration
+  }
+  return filtered
 }
 
 // 创建发布记录

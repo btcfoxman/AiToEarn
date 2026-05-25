@@ -34,6 +34,8 @@ const DOMAIN_TO_ACCOUNT_TYPE: Record<string, AccountType> = {
   'linkedin.com': AccountType.LINKEDIN,
   'channels.weixin.qq.com': AccountType.WxSph,
   'mp.weixin.qq.com': AccountType.WxGzh,
+  'toutiao.com': AccountType.Toutiao,
+  'www.toutiao.com': AccountType.Toutiao,
 }
 
 /**

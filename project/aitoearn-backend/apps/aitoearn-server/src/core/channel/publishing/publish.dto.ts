@@ -53,6 +53,13 @@ export const WxGzhPublishOptionSchema = z.object({
   only_fans_can_comment: z.number().int().optional(),
 })
 
+export const OrchestrationPublishOptionSchema = z.object({
+  contentType: z.enum(['image_text', 'article', 'weitoutiao']),
+  publishTargetId: z.string().optional(),
+  articleHtml: z.string().optional(),
+  params: z.record(z.string(), z.any()).optional(),
+})
+
 export enum YouTubePrivacyStatus {
   Public = 'public',
   Unlisted = 'unlisted',
@@ -174,6 +181,7 @@ export const CreatePublishSchema = z.object({
     tiktok: TiktokPublishOptionSchema.optional(),
     googleBusiness: GoogleBusinessPublishOptionSchema.optional(),
     twitter: TwitterPublishOptionSchema.optional(),
+    orchestration: OrchestrationPublishOptionSchema.optional(),
   }).optional(),
 })
 export class CreatePublishDto extends createZodDto(CreatePublishSchema) { }
@@ -187,6 +195,7 @@ export const UpdatePublishTaskSchema = z.object({
   topics: z.array(z.string()).optional(),
   option: z.object({
     youtube: YouTubePublishOptionSchema.optional(),
+    orchestration: OrchestrationPublishOptionSchema.optional(),
   }).optional(),
 })
 export class UpdatePublishTaskDto extends createZodDto(UpdatePublishTaskSchema) { }

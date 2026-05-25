@@ -28,6 +28,15 @@ export const ImageTextDraftPlanResultSchema = z.object({
 
 export type ImageTextDraftPlanResult = z.infer<typeof ImageTextDraftPlanResultSchema>
 
+export const ArticleDraftPlanResultSchema = z.object({
+  title: z.string().max(200).describe('Article title'),
+  description: z.string().min(1).max(10000).describe('Article body in plain text or markdown'),
+  topics: z.array(z.string()).max(5).describe('Topic tags without # prefix'),
+  articleHtml: z.string().max(20000).optional().describe('Optional semantic HTML body for rich article publishing'),
+})
+
+export type ArticleDraftPlanResult = z.infer<typeof ArticleDraftPlanResultSchema>
+
 type PlannerModelConfig = (typeof config.ai.models.chat)[number]
 interface BasePlanInput {
   userId: string
@@ -54,6 +63,11 @@ interface ImageTextPlanInput extends BasePlanInput {
   imageCount: number
   imageSize?: string
   aspectRatio?: string
+}
+
+interface ArticlePlanInput extends BasePlanInput {
+  contentType: typeof DraftGenerationMemoryContentType.ImageText
+  captionPrompt?: string
 }
 
 const AutoMemoryResultSchema = z.object({
@@ -92,6 +106,17 @@ export class DraftGenerationPlannerService {
     if (plan.imagePrompts.length !== input.imageCount) {
       plan.imagePrompts = Array.from({ length: input.imageCount }, (_, index) => plan.imagePrompts[index] ?? plan.imagePrompts[0] ?? input.userPrompt ?? '')
     }
+    return { plan, model: modelConfig.name }
+  }
+
+  async planArticle(input: ArticlePlanInput): Promise<{ plan: ArticleDraftPlanResult, model: string }> {
+    const modelName = input.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+    const modelConfig = config.ai.models.chat.find(model => model.name === modelName && model.scenes?.includes('draft-generation'))
+    if (!modelConfig) {
+      throw new AppException(ResponseCode.InvalidModel)
+    }
+    const prompt = this.buildArticlePrompt(input)
+    const plan = await this.invokeStructuredPlanner(modelConfig, prompt, ArticleDraftPlanResultSchema, input.referenceImageUrls)
     return { plan, model: modelConfig.name }
   }
 
@@ -255,6 +280,42 @@ ${this.formatList(input.memoryItems)}
 - description: social post caption with clear value and CTA, in the SAME language as the user prompt, respecting any character limits from the prompt.
 - topics: 3-5 hashtag topics without #.
 - imagePrompts: exactly ${input.imageCount} prompts for image generation in the SAME language as the user prompt. Split carousel/page-style requests into different page goals when applicable. Keep explicit on-image text unchanged. Do NOT translate or include non-image output format constraints or character limits in the imagePrompts.`
+  }
+
+  private buildArticlePrompt(input: ArticlePlanInput): string {
+    const captionPrompt = input.captionPrompt?.trim()
+    const promptLabel = captionPrompt ? 'Article Prompt' : 'Current User Prompt'
+
+    return `You are an AI article draft planner for WeChat Official Account and Toutiao publishing.
+
+## System Rules
+- The current user prompt has higher priority than memory.
+- Merge memory naturally when relevant; do not say "based on your memory".
+- Generate title, description, topics, and articleHtml in the SAME language as the user prompt unless the user explicitly asks otherwise.
+- Keep the article useful, publishable, and factually cautious. Do not invent unsupported data, quotes, sources, or named cases.
+- For WeChat Official Account and Toutiao article publishing, prefer clear headings, short paragraphs, practical examples, and a concise conclusion.
+- If the target platform includes toutiao with micro-post style, keep the article body compact enough to be reusable as a Toutiao article or Weitoutiao source.
+- articleHtml is optional but recommended. Use semantic tags only: h2, h3, p, ul, ol, li, strong, em, blockquote. Do not include html/body/head/script/style tags.
+
+## ${promptLabel}
+${input.userPrompt || ''}
+
+## Additional Caption/Style Constraints
+${captionPrompt || 'None'}
+
+## User Memory
+${this.formatList(input.memoryItems)}
+
+## Generation Context
+- Content Type: article
+- Platforms: ${input.platforms?.join(', ') || 'default'}
+- Reference Images: ${input.referenceImageUrls?.join(', ') || 'none'}
+
+## Output Requirements
+- title: a concise publishable title.
+- description: the full article body, not a short social caption. Use paragraphs and section headings when helpful.
+- topics: 3-5 relevant topic tags without #.
+- articleHtml: semantic HTML version of the same article body when possible.`
   }
 
   private formatList(items: string[]): string {
