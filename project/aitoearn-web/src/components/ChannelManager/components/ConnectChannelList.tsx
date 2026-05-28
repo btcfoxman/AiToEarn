@@ -10,7 +10,10 @@ import { ArrowLeft, Info, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useShallow } from 'zustand/react/shallow'
-import { apiGetOrchestrationPublishTargets, apiLinkOrchestrationTarget } from '@/api/plat/orchestration'
+import {
+  apiGetOrchestrationPublishTargets,
+  apiLinkOrchestrationTarget,
+} from '@/api/plat/orchestration'
 import { AccountPlatInfoArr, PlatType } from '@/app/config/platConfig'
 import { useTransClient } from '@/app/i18n/client'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -33,37 +36,81 @@ import { useUserStore } from '@/store/user'
 import { navigateToLogin } from '@/utils/auth'
 import { useChannelManagerStore } from '../channelManagerStore'
 
+const PUBLISH_FEATURE_LABELS: Record<string, string> = {
+  poll: '投票',
+  wechat_channel_video: '视频号视频',
+  video_channel: '视频号视频',
+}
+
+function normalizePublishFeatures(value: unknown) {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,\s]+/)
+      : []
+  const result: string[] = []
+  for (const item of rawValues) {
+    const key = String(item ?? '').trim()
+    if (key && !result.includes(key)) {
+      result.push(key)
+    }
+  }
+  return result
+}
+
+function getTargetPublishFeatures(target: OrchestrationPublishTarget) {
+  const targetSnapshot = target.targetSnapshot as Record<string, unknown> | undefined
+  const snapshotCapabilities = targetSnapshot?.capabilities as Record<string, unknown> | undefined
+  const sources = [
+    target.features,
+    target.capabilities?.features,
+    target.capabilities?.publishFeatures,
+    target.capabilities?.publish_features,
+    target.capabilities?.supportedFeatures,
+    target.capabilities?.supported_features,
+    targetSnapshot?.features,
+    snapshotCapabilities?.features,
+    snapshotCapabilities?.publishFeatures,
+    snapshotCapabilities?.publish_features,
+    snapshotCapabilities?.supportedFeatures,
+    snapshotCapabilities?.supported_features,
+  ]
+  return [...new Set(sources.flatMap(normalizePublishFeatures))]
+}
+
 export function ConnectChannelList() {
   const { t } = useTransClient('account')
   const isMobile = useIsMobile()
-  const [orchestrationPlatform, setOrchestrationPlatform] = useState<PlatType.WxGzh | PlatType.Toutiao | null>(null)
+  const [orchestrationPlatform, setOrchestrationPlatform] = useState<
+    PlatType.WxGzh | PlatType.Toutiao | null
+  >(null)
   const [publishTargets, setPublishTargets] = useState<OrchestrationPublishTarget[]>([])
   const [targetsLoading, setTargetsLoading] = useState(false)
   const [linkingTargetId, setLinkingTargetId] = useState<string | null>(null)
 
-  const { isNewUser, setCurrentView, startAuth, targetSpaceId, setTargetSpaceId, closeModal }
-    = useChannelManagerStore(
-      useShallow(state => ({
+  const { isNewUser, setCurrentView, startAuth, targetSpaceId, setTargetSpaceId, closeModal } =
+    useChannelManagerStore(
+      useShallow((state) => ({
         isNewUser: state.isNewUser,
         setCurrentView: state.setCurrentView,
         startAuth: state.startAuth,
         targetSpaceId: state.targetSpaceId,
         setTargetSpaceId: state.setTargetSpaceId,
         closeModal: state.closeModal,
-      })),
+      }))
     )
 
   const { accountGroupList } = useAccountStore(
-    useShallow(state => ({
+    useShallow((state) => ({
       accountGroupList: state.accountGroupList,
-    })),
+    }))
   )
-  const refreshAccountList = useAccountStore(state => state.getAccountList)
+  const refreshAccountList = useAccountStore((state) => state.getAccountList)
 
   const { token } = useUserStore(
-    useShallow(state => ({
+    useShallow((state) => ({
       token: state.token,
-    })),
+    }))
   )
 
   // 返回主页
@@ -72,13 +119,15 @@ export function ConnectChannelList() {
   }
 
   const orchestrationPlatformInfo = useMemo(() => {
-    return orchestrationPlatform ? AccountPlatInfoArr.find(([key]) => key === orchestrationPlatform)?.[1] : null
+    return orchestrationPlatform
+      ? AccountPlatInfoArr.find(([key]) => key === orchestrationPlatform)?.[1]
+      : null
   }, [orchestrationPlatform])
 
   const ensureTargetSpaceId = (): string | null => {
     let resolvedSpaceId = targetSpaceId
     if (!resolvedSpaceId) {
-      const defaultSpace = accountGroupList.find(g => g.isDefault)
+      const defaultSpace = accountGroupList.find((g) => g.isDefault)
       resolvedSpaceId = defaultSpace?.id || null
       if (resolvedSpaceId) {
         setTargetSpaceId(resolvedSpaceId)
@@ -94,8 +143,7 @@ export function ConnectChannelList() {
       if (res?.code === 0) {
         setPublishTargets(res.data ?? [])
       }
-    }
-    finally {
+    } finally {
       setTargetsLoading(false)
     }
   }
@@ -103,8 +151,7 @@ export function ConnectChannelList() {
   useEffect(() => {
     if (orchestrationPlatform) {
       loadOrchestrationTargets(orchestrationPlatform)
-    }
-    else {
+    } else {
       setPublishTargets([])
     }
   }, [orchestrationPlatform])
@@ -127,8 +174,7 @@ export function ConnectChannelList() {
         setOrchestrationPlatform(null)
         setCurrentView('main')
       }
-    }
-    finally {
+    } finally {
       setLinkingTargetId(null)
     }
   }
@@ -177,7 +223,13 @@ export function ConnectChannelList() {
     <div className="flex h-full flex-col">
       {/* 头部 - 返回按钮 */}
       <div className="flex items-center gap-3 border-b px-4 py-3">
-        <Button data-testid="cm-connect-back-btn" variant="ghost" size="sm" className="cursor-pointer" onClick={handleBack}>
+        <Button
+          data-testid="cm-connect-back-btn"
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer"
+          onClick={handleBack}
+        >
           <ArrowLeft className="mr-1 h-4 w-4" />
           {t('channelManager.backToChannels')}
         </Button>
@@ -185,7 +237,10 @@ export function ConnectChannelList() {
 
       {/* 新用户提示 */}
       {isNewUser && (
-        <div data-testid="cm-connect-new-user-tip" className="mx-4 mt-4 flex items-center gap-3 rounded-lg border bg-muted/30 p-4">
+        <div
+          data-testid="cm-connect-new-user-tip"
+          className="mx-4 mt-4 flex items-center gap-3 rounded-lg border bg-muted/30 p-4"
+        >
           <Sparkles className="h-6 w-6 shrink-0 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">{t('channelManager.newUserTip')}</p>
         </div>
@@ -286,7 +341,10 @@ export function ConnectChannelList() {
         </div>
       </ScrollArea>
 
-      <Dialog open={!!orchestrationPlatform} onOpenChange={open => !open && setOrchestrationPlatform(null)}>
+      <Dialog
+        open={!!orchestrationPlatform}
+        onOpenChange={(open) => !open && setOrchestrationPlatform(null)}
+      >
         <DialogContent className="sm:w-[min(720px,95vw)]">
           <DialogHeader>
             <DialogTitle>{orchestrationPlatformInfo?.name || orchestrationPlatform}</DialogTitle>
@@ -308,6 +366,7 @@ export function ConnectChannelList() {
             ) : (
               publishTargets.map((target) => {
                 const contentTypes = target.contentTypes ?? target.capabilities?.contentTypes ?? []
+                const features = getTargetPublishFeatures(target)
                 return (
                   <div
                     key={target.publishTargetId}
@@ -321,11 +380,25 @@ export function ConnectChannelList() {
                         {target.publishTargetId}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {contentTypes.map(contentType => (
+                        {contentTypes.map((contentType) => (
                           <Badge key={contentType} variant="secondary" className="text-[11px]">
                             {contentType}
                           </Badge>
                         ))}
+                        {features.map((feature) => (
+                          <Badge
+                            key={feature}
+                            variant="outline"
+                            className="text-[11px] text-emerald-700"
+                          >
+                            {PUBLISH_FEATURE_LABELS[feature] || feature}
+                          </Badge>
+                        ))}
+                        {target.platform === PlatType.WxGzh && features.length === 0 && (
+                          <Badge variant="outline" className="text-[11px] text-amber-600">
+                            组件能力未声明
+                          </Badge>
+                        )}
                         {!target.ready && (
                           <Badge variant="outline" className="text-[11px] text-amber-600">
                             {target.reason || target.status || 'not_ready'}
@@ -338,7 +411,9 @@ export function ConnectChannelList() {
                       disabled={!target.ready || linkingTargetId === target.publishTargetId}
                       onClick={() => handleLinkOrchestrationTarget(target)}
                     >
-                      {linkingTargetId === target.publishTargetId && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                      {linkingTargetId === target.publishTargetId && (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      )}
                       Link
                     </Button>
                   </div>
@@ -354,7 +429,10 @@ export function ConnectChannelList() {
               </Button>
             )}
             {orchestrationPlatform && (
-              <Button variant="outline" onClick={() => loadOrchestrationTargets(orchestrationPlatform)}>
+              <Button
+                variant="outline"
+                onClick={() => loadOrchestrationTargets(orchestrationPlatform)}
+              >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Refresh
               </Button>

@@ -19,7 +19,7 @@ vi.mock('../../../config', () => ({
 
 const mockedAxios = vi.mocked(axios)
 
-describe('OrchestrationPublishClient', () => {
+describe('orchestrationPublishClient', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {

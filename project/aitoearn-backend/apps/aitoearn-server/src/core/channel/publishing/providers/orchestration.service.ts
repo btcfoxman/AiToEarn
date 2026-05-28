@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import { AssetsService } from '@yikart/assets'
 import { AccountType } from '@yikart/common'
 import { PublishRecord, PublishStatus, PublishType } from '@yikart/mongodb'
-import { ChannelAccountService } from '../../platforms/channel-account.service'
 import { OrchestrationPublishClient } from '../../orchestration-publish/orchestration-publish.client'
+import { ChannelAccountService } from '../../platforms/channel-account.service'
 import { CreatePublishDto } from '../publish.dto'
 import { PublishingException } from '../publishing.exception'
 import { PublishingTaskResult, VerifyPublishResult } from '../publishing.interface'
@@ -12,6 +12,69 @@ import { PublishService } from './base.service'
 const ORCHESTRATION_PROVIDER = 'ai-orchestration'
 const CONTENT_TYPES = ['image_text', 'article', 'weitoutiao'] as const
 type OrchestrationContentType = typeof CONTENT_TYPES[number]
+type OptionalArticleFeature = 'poll' | 'wechat_channel_video'
+
+const OPTIONAL_ARTICLE_FEATURE_ALIASES: Record<string, OptionalArticleFeature> = {
+  poll: 'poll',
+  vote: 'poll',
+  voting: 'poll',
+  wechat_channel_video: 'wechat_channel_video',
+  wechat_channels_video: 'wechat_channel_video',
+  video_channel: 'wechat_channel_video',
+  wx_channels_video: 'wechat_channel_video',
+  wx_sph_video: 'wechat_channel_video',
+}
+
+function normalizeOptionalArticleFeature(value: unknown): OptionalArticleFeature | null {
+  const key = String(value ?? '').trim().replace(/[\s-]+/g, '_').toLowerCase()
+  return OPTIONAL_ARTICLE_FEATURE_ALIASES[key] ?? null
+}
+
+function normalizeOptionalArticleFeatures(value: unknown): OptionalArticleFeature[] {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,\s]+/)
+      : []
+  const result: OptionalArticleFeature[] = []
+  for (const item of rawValues) {
+    const feature = normalizeOptionalArticleFeature(item)
+    if (feature && !result.includes(feature)) {
+      result.push(feature)
+    }
+  }
+  return result
+}
+
+function withBestEffortArticleFeatures(params: Record<string, unknown>) {
+  const nextParams = { ...params }
+  const features = new Set<OptionalArticleFeature>([
+    ...normalizeOptionalArticleFeatures(nextParams.requested_features),
+    ...normalizeOptionalArticleFeatures(nextParams.requestedFeatures),
+  ])
+
+  features.delete('poll')
+  features.delete('wechat_channel_video')
+  if (nextParams.insert_poll === true) {
+    features.add('poll')
+  }
+  if (nextParams.insert_video_channel === true) {
+    features.add('wechat_channel_video')
+  }
+
+  const requestedFeatures = Array.from(features)
+  delete nextParams.requestedFeatures
+  delete nextParams.featurePolicy
+  if (requestedFeatures.length > 0) {
+    nextParams.requested_features = requestedFeatures
+    nextParams.feature_policy = nextParams.feature_policy || 'best_effort'
+  }
+  else {
+    delete nextParams.requested_features
+    delete nextParams.feature_policy
+  }
+  return nextParams
+}
 
 @Injectable()
 export class OrchestrationPublishService extends PublishService {
@@ -40,7 +103,8 @@ export class OrchestrationPublishService extends PublishService {
     if (!contentType) {
       return { success: false, message: 'Unsupported orchestration content type' }
     }
-    if (!publishTask.desc) {
+    const articleHtml = publishTask.option?.articleHtml || publishTask.option?.orchestration?.articleHtml
+    if (!publishTask.desc && !articleHtml) {
       return { success: false, message: 'Content body is required' }
     }
     if (contentType !== 'weitoutiao' && !publishTask.title) {
@@ -84,6 +148,8 @@ export class OrchestrationPublishService extends PublishService {
     const requestId = `aitoearn:${publishTask.id}`
     const platform = publishTask.accountType === AccountType.WxGzh ? AccountType.WxGzh : AccountType.Toutiao
     const publishTargetId = publishTask.option?.orchestration?.publishTargetId || account.externalId || account.uid
+    const orchestrationParams = withBestEffortArticleFeatures(publishTask.option?.orchestration?.params || {})
+    const articleHtml = publishTask.option?.articleHtml || publishTask.option?.orchestration?.articleHtml
     const response = await this.orchestrationClient.createPublishTask({
       business_system: 'aitoearn',
       request_id: requestId,
@@ -97,14 +163,14 @@ export class OrchestrationPublishService extends PublishService {
       content: {
         title: publishTask.title || '',
         body: publishTask.desc || '',
-        html: publishTask.option?.articleHtml || publishTask.option?.orchestration?.articleHtml,
+        html: articleHtml,
         image_urls: imageUrls,
         media_urls: imageUrls,
         cover_url: coverUrl,
         topics: publishTask.topics || [],
         extra: {
           ...(publishTask.option?.wxGzh || {}),
-          ...(publishTask.option?.orchestration?.params || {}),
+          ...orchestrationParams,
           materialId: publishTask.materialId,
           materialGroupId: publishTask.materialGroupId,
         },
@@ -185,7 +251,7 @@ export class OrchestrationPublishService extends PublishService {
     if (!value) {
       return ''
     }
-    if (/^(https?:|data:|file:)/i.test(value)) {
+    if (/^(?:https?:|data:|file:)/i.test(value)) {
       return value
     }
     return this.assetsService.buildUrl(value)

@@ -12,8 +12,14 @@ export interface OrchestrationPublishTarget {
   status: string
   reason?: string
   contentTypes: string[]
+  features?: string[]
   capabilities?: {
     contentTypes?: string[]
+    features?: string[]
+    publishFeatures?: string[]
+    publish_features?: string[]
+    supportedFeatures?: string[]
+    supported_features?: string[]
   }
   account?: Record<string, any>
   mobile?: Record<string, any> | null

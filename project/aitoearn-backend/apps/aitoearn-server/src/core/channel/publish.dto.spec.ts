@@ -34,7 +34,7 @@ vi.doMock('@yikart/mongodb', () => ({
 
 const { CreatePublishSchema, createPublishRecordSchema } = await import('./publish.dto')
 
-describe('CreatePublishSchema', () => {
+describe('create publish schema', () => {
   it('keeps orchestration publish options for mobile publishing', () => {
     const result = CreatePublishSchema.safeParse({
       accountId: 'acc_wxgzh',
@@ -54,6 +54,8 @@ describe('CreatePublishSchema', () => {
             insert_poll: true,
             poll_question: 'Question?',
             poll_options: ['A', 'B'],
+            requested_features: ['wechat_channel_video', 'poll'],
+            feature_policy: 'best_effort',
           },
         },
       },
@@ -70,6 +72,8 @@ describe('CreatePublishSchema', () => {
         insert_poll: true,
         poll_question: 'Question?',
         poll_options: ['A', 'B'],
+        requested_features: ['wechat_channel_video', 'poll'],
+        feature_policy: 'best_effort',
       },
     })
   })

@@ -2,6 +2,12 @@ import type { PlatType } from '@/app/config/platConfig'
 import http from '@/utils/request'
 
 export type OrchestrationPublishContentType = 'image_text' | 'article' | 'weitoutiao'
+export type OrchestrationPublishFeature =
+  | 'rich_text'
+  | 'image'
+  | 'video'
+  | 'wechat_channel_video'
+  | 'poll'
 
 export interface OrchestrationPublishTarget {
   publishTargetId: string
@@ -13,8 +19,14 @@ export interface OrchestrationPublishTarget {
   status?: string
   reason?: string
   contentTypes?: OrchestrationPublishContentType[]
+  features?: OrchestrationPublishFeature[]
   capabilities?: {
     contentTypes?: OrchestrationPublishContentType[]
+    features?: OrchestrationPublishFeature[]
+    publishFeatures?: OrchestrationPublishFeature[]
+    publish_features?: OrchestrationPublishFeature[]
+    supportedFeatures?: OrchestrationPublishFeature[]
+    supported_features?: OrchestrationPublishFeature[]
   }
   targetSnapshot?: Record<string, unknown>
   [key: string]: unknown
