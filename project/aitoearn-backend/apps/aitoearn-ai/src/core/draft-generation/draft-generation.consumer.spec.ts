@@ -21,13 +21,14 @@ vi.mock('nestjs-pino', () => ({
 
 describe('draftGenerationConsumer', () => {
   let consumer: DraftGenerationConsumer
-  let mockDraftGenerationService: vi.Mocked<Pick<DraftGenerationService, 'generateContentV2' | 'generateContentImageText'>>
+  let mockDraftGenerationService: vi.Mocked<Pick<DraftGenerationService, 'generateContentV2' | 'generateContentImageText' | 'generateContentArticle'>>
   let mockAiLogRepository: vi.Mocked<Pick<AiLogRepository, 'getById' | 'updateById'>>
 
   beforeEach(() => {
     mockDraftGenerationService = {
       generateContentV2: vi.fn().mockResolvedValue({ consumedPoints: 3 }),
       generateContentImageText: vi.fn().mockResolvedValue({ consumedPoints: 5 }),
+      generateContentArticle: vi.fn().mockResolvedValue({ consumedPoints: 7 }),
     }
     mockAiLogRepository = {
       getById: vi.fn(),
@@ -70,6 +71,7 @@ describe('draftGenerationConsumer', () => {
       }),
     )
     expect(mockDraftGenerationService.generateContentImageText).not.toHaveBeenCalled()
+    expect(mockDraftGenerationService.generateContentArticle).not.toHaveBeenCalled()
   })
 
   it('v2-image-text job 透传 captionPrompt', async () => {
@@ -103,6 +105,49 @@ describe('draftGenerationConsumer', () => {
       }),
     )
     expect(mockDraftGenerationService.generateContentV2).not.toHaveBeenCalled()
+    expect(mockDraftGenerationService.generateContentArticle).not.toHaveBeenCalled()
+  })
+
+  it('v2-article job passes reference image and image model params', async () => {
+    await consumer.process({
+      id: 'job-1',
+      name: 'draft-generation',
+      queueName: 'draft-generation',
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      data: {
+        aiLogId: 'log-1',
+        userId: 'user-1',
+        userType: UserType.User,
+        groupId: 'group-1',
+        version: 'v2-article',
+        prompt: 'article prompt',
+        captionPrompt: 'layout prompt',
+        imageUrls: ['https://example.com/ref.png'],
+        imageModel: 'gemini-3.1-flash-image-preview',
+        imageCount: 2,
+        imageSize: '1K',
+        aspectRatio: '16:9',
+      },
+    } as Job<DraftGenerationData>)
+
+    expect(mockDraftGenerationService.generateContentArticle).toHaveBeenCalledWith(
+      'log-1',
+      'user-1',
+      UserType.User,
+      'group-1',
+      expect.objectContaining({
+        prompt: 'article prompt',
+        captionPrompt: 'layout prompt',
+        imageUrls: ['https://example.com/ref.png'],
+        imageModel: 'gemini-3.1-flash-image-preview',
+        imageCount: 2,
+        imageSize: '1K',
+        aspectRatio: '16:9',
+      }),
+    )
+    expect(mockDraftGenerationService.generateContentV2).not.toHaveBeenCalled()
+    expect(mockDraftGenerationService.generateContentImageText).not.toHaveBeenCalled()
   })
 
   it('未知版本不再 fallback 到 v1', async () => {
@@ -125,6 +170,7 @@ describe('draftGenerationConsumer', () => {
 
     expect(mockDraftGenerationService.generateContentV2).not.toHaveBeenCalled()
     expect(mockDraftGenerationService.generateContentImageText).not.toHaveBeenCalled()
+    expect(mockDraftGenerationService.generateContentArticle).not.toHaveBeenCalled()
     expect(mockAiLogRepository.updateById).toHaveBeenCalledWith('log-1', {
       $set: {
         status: AiLogStatus.Failed,

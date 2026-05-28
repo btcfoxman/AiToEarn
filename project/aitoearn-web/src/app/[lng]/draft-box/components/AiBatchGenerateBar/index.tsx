@@ -371,7 +371,10 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
       return
 
     const availableModels = pricingData.imageModels.map(model => model.model)
-    const nextSelectedModels = normalizeSelectedValues(selectedImageModels, availableModels, imageModel)
+    const normalizedSelectedModels = normalizeSelectedValues(selectedImageModels, availableModels, imageModel)
+    const nextSelectedModels = contentType === 'article'
+      ? normalizedSelectedModels.slice(0, 1)
+      : normalizedSelectedModels
     const nextPrimaryModel = nextSelectedModels[0] ?? ''
     const nextModelInfos = nextSelectedModels
       .map(model => pricingData.imageModels.find(item => item.model === model))
@@ -396,7 +399,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
       updateConfig(configKey, { imageSize: firstSize })
     }
     // 图文模式下校验比例是否在当前图片模型支持范围内
-    if (contentType === 'image_text') {
+    if (contentType === 'image_text' || contentType === 'article') {
       if (nextRatios.length > 0 && !includesOption(nextRatios, aspectRatio)) {
         const firstRatio = nextRatios[0] ?? '1:1'
         setAspectRatio(firstRatio)
@@ -478,7 +481,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     // 设置默认图片
     const currentImageList = brandInfo.imageList ?? []
     if (currentImageList.length > 0) {
-      const maxImages = contentType === 'image_text'
+      const maxImages = contentType === 'image_text' || contentType === 'article'
         ? currentImageMaxInputImages
         : currentVideoModelConfig.maxImages
       const defaultCount = Math.min(5, maxImages, currentImageList.length)
@@ -513,7 +516,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
   // imageList 异步加载后自动选中默认图片
   useEffect(() => {
     if (!initialSelectionDone.current && imageList.length > 0) {
-      const maxImages = contentType === 'image_text'
+      const maxImages = contentType === 'image_text' || contentType === 'article'
         ? currentImageMaxInputImages
         : currentVideoModelConfig.maxImages
       const defaultCount = Math.min(5, maxImages, imageList.length)
@@ -585,6 +588,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
   // 是否为视频编辑模式（上传了视频 + 视频内容类型）
   const isVideoEditMode = hasVideos && contentType === 'video'
   const isArticleMode = contentType === 'article'
+  const usesImageGeneration = contentType === 'image_text' || isArticleMode
 
   // 图文非草稿模式不展示数量控件，提交时固定为 1，避免与草稿模式 quantity 串用
   const effectiveQuantity = useMemo(() => {
@@ -609,7 +613,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     return Math.ceil(pricePerImage * imageCount * effectiveQuantity * 100) / 100
   }, [effectiveQuantity, imageCount, imagePricing, imageSize])
 
-  const totalCredits = contentType === 'video' ? videoCredits : isArticleMode ? 0 : imageTextCredits
+  const totalCredits = contentType === 'video' ? videoCredits : imageTextCredits
 
   // hasVideos 变化时自动 clamp duration（video2video 最大 duration 可能更小）
   useEffect(() => {
@@ -1025,8 +1029,16 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
   const handleContentTypeChange = useCallback((ct: DraftContentType) => {
     setContentType(ct)
     updateConfig(configKey, { contentType: ct })
+    if (ct === 'article' && selectedImageModels.length > 1) {
+      const nextSelectedImageModels = selectedImageModels.slice(0, 1)
+      setSelectedImageModels(nextSelectedImageModels)
+      updateConfig(configKey, {
+        selectedImageModels: nextSelectedImageModels,
+        imageModel: nextSelectedImageModels[0]!,
+      })
+    }
     // 切换内容类型时校验并重置比例
-    if (ct === 'image_text') {
+    if (ct === 'image_text' || ct === 'article') {
       const supported = currentImageAspectRatios
       if (!includesOption(supported, aspectRatio)) {
         const defaultRatio = supported[0] ?? '1:1'
@@ -1042,7 +1054,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
         updateConfig(configKey, { aspectRatio: defaultRatio })
       }
     }
-    const maxImages = ct === 'image_text'
+    const maxImages = ct === 'image_text' || ct === 'article'
       ? currentImageMaxInputImages
       : ct === 'video' ? currentVideoModelConfig.maxImages : 0
     const maxVideos = ct === 'video' ? currentVideoModelConfig.maxVideos : 0
@@ -1067,7 +1079,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
       setSelectedIds(defaultIds)
       updateConfig(configKey, { selectedImageIds: defaultIds })
     }
-  }, [configKey, updateConfig, currentVideoModelConfig, currentImageMaxInputImages, currentImageAspectRatios, imageList, aspectRatio, localMedias, selectedIds, setMedias])
+  }, [configKey, updateConfig, currentVideoModelConfig, currentImageMaxInputImages, currentImageAspectRatios, imageList, aspectRatio, localMedias, selectedIds, selectedImageModels, setMedias])
 
   const handleImageModelsChange = useCallback((models: string[]) => {
     if (models.length === 0)
@@ -1322,7 +1334,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     const videoFiles = fileArray.filter(f => f.type.startsWith('video/'))
 
     // 验证图片数量
-    const maxImages = contentType === 'image_text'
+    const maxImages = usesImageGeneration
       ? currentImageMaxInputImages
       : currentVideoModelConfig.maxImages
     const currentImageCount = selectedIds.length + localImages.length
@@ -1403,7 +1415,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
       validFiles.forEach(f => dt.items.add(f))
       uploadMedias(dt.files)
     }
-  }, [currentVideoModelConfig, currentImageMaxInputImages, contentType, imageModel, selectedIds.length, localImages.length, localVideos.length, uploadMedias, aspectRatio, configKey, updateConfig, t])
+  }, [currentVideoModelConfig, currentImageMaxInputImages, contentType, usesImageGeneration, imageModel, selectedIds.length, localImages.length, localVideos.length, uploadMedias, aspectRatio, configKey, updateConfig, t])
 
   // 拖拽事件处理
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -1475,6 +1487,15 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
     ]
 
     if (contentType === 'article') {
+      if (selectedImageModels.length === 0) {
+        toast.warning(t('detail.selectModelRequired'))
+        return
+      }
+      if (currentImageAspectRatios.length === 0 || imagePricing.length === 0) {
+        toast.warning(t('detail.noCommonModelParams'))
+        return
+      }
+
       const result = await createArticleBatchGeneration(
         effectiveQuantity,
         promptValue.trim(),
@@ -1482,6 +1503,11 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
         effectiveSelectedPlatforms.length > 0 ? effectiveSelectedPlatforms : undefined,
         'article',
         captionPromptForSubmit || undefined,
+        selectedImageModels[0]!,
+        imageCount,
+        aspectRatio,
+        imageUrls.length > 0 ? imageUrls : undefined,
+        imageSize,
       )
       if (result.success) {
         toast.success(t('detail.imageTextGenerated'))
@@ -1566,7 +1592,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
         toast.error(result.errorMessage || t('detail.multiModelGenerateFailed'))
       }
     }
-  }, [promptValue, aspectRatio, duration, resolution, selectedImages, localImages, localVideos, effectiveQuantity, createBatchGenerationWithModels, createImageTextBatchGenerationWithModels, createArticleBatchGeneration, contentType, selectedImageModels, selectedVideoModels, currentImageAspectRatios.length, imagePricing.length, currentVideoModelConfig.supportedRatios, imageCount, isUploading, t, groupId, onGenerated, effectiveSelectedPlatforms, isDraftMode, captionPrompt, captionSystemPrompt])
+  }, [promptValue, aspectRatio, duration, resolution, selectedImages, localImages, localVideos, effectiveQuantity, createBatchGenerationWithModels, createImageTextBatchGenerationWithModels, createArticleBatchGeneration, contentType, selectedImageModels, selectedVideoModels, currentImageAspectRatios.length, imagePricing.length, currentVideoModelConfig.supportedRatios, imageCount, imageSize, isUploading, t, groupId, onGenerated, effectiveSelectedPlatforms, isDraftMode, captionPrompt, captionSystemPrompt])
 
   // Prompts 探索页 URL（根据当前模型族切换 grok / seedance 提示词页）
   const promptsExploreUrl = useMemo(() => {
@@ -1591,7 +1617,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
   }, [t])
 
   // 上传能力判断
-  const maxUploadImages = contentType === 'image_text'
+  const maxUploadImages = usesImageGeneration
     ? currentImageMaxInputImages
     : contentType === 'video' ? currentVideoModelConfig.maxImages : 0
   const canUploadImage = selectedIds.length + localImages.length < maxUploadImages
@@ -1612,7 +1638,7 @@ const AiBatchGenerateBar = memo(({ groupId, onGenerated, className, forceDraftMo
             images={selectedImages}
             allImages={imageList}
             selectedIds={selectedIds}
-            maxImages={contentType === 'image_text' ? currentImageMaxInputImages : contentType === 'video' ? currentVideoModelConfig.maxImages : 0}
+            maxImages={usesImageGeneration ? currentImageMaxInputImages : contentType === 'video' ? currentVideoModelConfig.maxImages : 0}
             onImagesChange={handleImagesChange}
             localMedias={localMedias}
             onLocalMediaRemove={handleLocalMediaRemove}

@@ -837,6 +837,11 @@ export const usePlanDetailStore = create(
         platforms?: PlatType[],
         draftType?: ArticleDraftType,
         captionPrompt?: string,
+        imageModel?: ImageModelType,
+        imageCount?: number,
+        aspectRatio?: string,
+        imageUrls?: string[],
+        imageSize?: string,
       ): Promise<BatchGenerationCreateResult> => {
         const groupId = overrideGroupId || get().currentPlan?.id
         if (!groupId) {
@@ -850,6 +855,11 @@ export const usePlanDetailStore = create(
             groupId,
             prompt,
             captionPrompt: captionPrompt || undefined,
+            imageModel,
+            imageCount,
+            imageUrls,
+            aspectRatio,
+            imageSize,
             platforms: platforms?.length ? platforms : undefined,
             draftType,
           })
@@ -869,6 +879,11 @@ export const usePlanDetailStore = create(
             groupId,
             prompt,
             captionPrompt: captionPrompt || undefined,
+            imageModel,
+            imageCount,
+            imageUrls,
+            aspectRatio,
+            imageSize,
             platforms,
             draftType,
           }))

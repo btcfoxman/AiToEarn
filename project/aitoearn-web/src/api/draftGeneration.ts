@@ -142,6 +142,11 @@ export function apiCreateArticleDraft(data: {
   groupId: string
   prompt: string
   captionPrompt?: string
+  imageModel?: ImageModelType
+  imageCount?: number
+  imageUrls?: string[]
+  aspectRatio?: string
+  imageSize?: string
   platforms?: PlatType[]
   draftType?: ArticleDraftType
 }) {

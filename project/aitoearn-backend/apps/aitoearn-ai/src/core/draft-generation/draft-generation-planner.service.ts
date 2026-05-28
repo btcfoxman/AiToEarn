@@ -33,6 +33,7 @@ export const ArticleDraftPlanResultSchema = z.object({
   description: z.string().min(1).max(10000).describe('Article body in plain text or markdown'),
   topics: z.array(z.string()).max(5).describe('Topic tags without # prefix'),
   articleHtml: z.string().max(20000).optional().describe('Optional semantic HTML body for rich article publishing'),
+  imagePrompts: z.array(z.string().min(1).max(1000)).max(9).optional().describe('Optional prompts for article illustration images'),
 })
 
 export type ArticleDraftPlanResult = z.infer<typeof ArticleDraftPlanResultSchema>
@@ -68,6 +69,10 @@ interface ImageTextPlanInput extends BasePlanInput {
 interface ArticlePlanInput extends BasePlanInput {
   contentType: typeof DraftGenerationMemoryContentType.ImageText
   captionPrompt?: string
+  imageModel?: string
+  imageCount?: number
+  imageSize?: string
+  aspectRatio?: string
 }
 
 const AutoMemoryResultSchema = z.object({
@@ -117,6 +122,11 @@ export class DraftGenerationPlannerService {
     }
     const prompt = this.buildArticlePrompt(input)
     const plan = await this.invokeStructuredPlanner(modelConfig, prompt, ArticleDraftPlanResultSchema, input.referenceImageUrls)
+    if (input.imageCount && input.imageCount > 0) {
+      const fallbackPrompt = `${plan.title}\n\n${plan.description}`.slice(0, 1000)
+      plan.imagePrompts = Array.from({ length: input.imageCount }, (_, index) =>
+        plan.imagePrompts?.[index] ?? plan.imagePrompts?.[0] ?? fallbackPrompt)
+    }
     return { plan, model: modelConfig.name }
   }
 
@@ -285,6 +295,9 @@ ${this.formatList(input.memoryItems)}
   private buildArticlePrompt(input: ArticlePlanInput): string {
     const captionPrompt = input.captionPrompt?.trim()
     const promptLabel = captionPrompt ? 'Article Prompt' : 'Current User Prompt'
+    const imageOutputRequirement = input.imageModel && input.imageCount
+      ? `- imagePrompts: exactly ${input.imageCount} prompts for article illustration image generation. Keep the same language as the user prompt and align each prompt to a useful section of the article.`
+      : '- imagePrompts: omit unless article illustration images are explicitly requested.'
 
     return `You are an AI article draft planner for WeChat Official Account and Toutiao publishing.
 
@@ -309,13 +322,18 @@ ${this.formatList(input.memoryItems)}
 ## Generation Context
 - Content Type: article
 - Platforms: ${input.platforms?.join(', ') || 'default'}
+- Image Model: ${input.imageModel || 'none'}
+- Image Count: ${input.imageCount ?? 0}
+- Image Size: ${input.imageSize ?? 'default'}
+- Aspect Ratio: ${input.aspectRatio ?? 'default'}
 - Reference Images: ${input.referenceImageUrls?.join(', ') || 'none'}
 
 ## Output Requirements
 - title: a concise publishable title.
 - description: the full article body, not a short social caption. Use paragraphs and section headings when helpful.
 - topics: 3-5 relevant topic tags without #.
-- articleHtml: semantic HTML version of the same article body when possible.`
+- articleHtml: semantic HTML version of the same article body when possible.
+${imageOutputRequirement}`
   }
 
   private formatList(items: string[]): string {

@@ -308,6 +308,13 @@ export function checkPlatformCompatibility(
       if (!platInfo.pubTypes.has(PubType.Article) && !platInfo.pubTypes.has(PubType.Weitoutiao)) {
         reasons.push(t('detail.platformIncompatible.contentTypeNotSupported'))
       }
+      else {
+        const constraint = PLATFORM_CONSTRAINTS[plat]
+        const maxImages = constraint?.imagesMax ?? platInfo.commonPubParamsConfig.imagesMax
+        if (maxImages !== undefined && imageCount > maxImages) {
+          reasons.push(t('detail.platformIncompatible.imageCountExceeded', { max: maxImages }))
+        }
+      }
     }
     else {
       // 图文模式

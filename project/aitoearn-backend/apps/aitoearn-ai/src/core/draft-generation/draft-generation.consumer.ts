@@ -36,14 +36,19 @@ abstract class DraftGenerationConsumerBase extends WorkerHost {
 
     try {
       if (version === 'v2-article') {
-        const { prompt, captionPrompt, articleDraftType, platforms, plannerModel, disableMemory } = job.data
+        const { prompt, captionPrompt, imageUrls, imageModel, imageCount, imageSize, aspectRatio, articleDraftType, platforms, plannerModel, disableMemory } = job.data
         this.logger.log(
-          { aiLogId, promptLength: prompt?.length ?? 0, draftType: articleDraftType },
+          { aiLogId, imageModel, imageCount, aspectRatio, imageUrlsCount: imageUrls?.length ?? 0, promptLength: prompt?.length ?? 0, draftType: articleDraftType },
           'Processing v2-article generation',
         )
         const { consumedPoints } = await this.draftGenerationService.generateContentArticle(aiLogId, userId, userType, groupId, {
           prompt: prompt ?? '',
           captionPrompt,
+          imageUrls,
+          imageModel,
+          imageCount,
+          imageSize,
+          aspectRatio,
           draftType: articleDraftType,
           platforms,
           plannerModel,

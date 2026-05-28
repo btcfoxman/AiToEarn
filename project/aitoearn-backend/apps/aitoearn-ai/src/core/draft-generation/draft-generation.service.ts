@@ -139,6 +139,11 @@ interface ArticleDraftResponse {
   title?: string
   description?: string
   topics?: string[]
+  coverUrl?: string
+  imageUrls?: string[]
+  requestedImageCount?: number
+  generatedImageCount?: number
+  imageGenerationErrors?: ImageGenerationErrorDetail[]
   articleHtml?: string
   plan?: ArticleDraftPlanResult
 }
@@ -484,9 +489,16 @@ export class DraftGenerationService {
     if (!plannerModelConfig) {
       throw new AppException(ResponseCode.InvalidModel)
     }
-    await this.assertUserCreditsSufficient(userId, userType, 0)
-
     const quantity = dto.quantity ?? 1
+    const imageModelConfig = dto.imageModel ? this.getImageTextDraftModelConfig(dto.imageModel) : undefined
+    const runtimeImageModel = dto.imageModel && imageModelConfig ? imageModelConfig.runtimeModel ?? dto.imageModel : undefined
+    const queuePriority = imageModelConfig?.queuePriority
+    const imageExecution = dto.imageModel ? this.resolveImageExecution(dto.imageModel, dto.imageUrls ?? [], dto.aspectRatio) : undefined
+    const estimatedImagePoints = dto.imageModel
+      ? this.getImageTextDraftPricingEntry(dto.imageModel, dto.imageSize).pricePerImage * (dto.imageCount ?? 3) * quantity
+      : 0
+    await this.assertUserCreditsSufficient(userId, userType, estimatedImagePoints)
+
     const aiLogIds: string[] = []
 
     for (let i = 0; i < quantity; i++) {
@@ -504,9 +516,17 @@ export class DraftGenerationService {
           version: 'v2-article',
           prompt: dto.prompt,
           captionPrompt: dto.captionPrompt,
+          imageUrls: dto.imageUrls,
+          imageModel: dto.imageModel,
+          imageCount: dto.imageCount,
+          imageSize: dto.imageSize,
+          aspectRatio: dto.aspectRatio,
           draftType,
           platforms: dto.platforms,
           plannerModel,
+          runtimeImageModel,
+          queuePriority,
+          imageExecution,
         },
         response: {},
       })
@@ -519,10 +539,16 @@ export class DraftGenerationService {
         version: 'v2-article',
         prompt: dto.prompt,
         captionPrompt: dto.captionPrompt,
+        imageUrls: dto.imageUrls,
+        imageModel: dto.imageModel,
+        imageCount: dto.imageCount,
+        imageSize: dto.imageSize,
+        aspectRatio: dto.aspectRatio,
         articleDraftType: draftType,
         platforms: dto.platforms,
         plannerModel,
         disableMemory: dto.disableMemory,
+        queuePriority,
       })
 
       aiLogIds.push(aiLog.id)
@@ -550,6 +576,11 @@ export class DraftGenerationService {
     options: {
       prompt: string
       captionPrompt?: string
+      imageUrls?: string[]
+      imageModel?: string
+      imageCount?: number
+      imageSize?: string
+      aspectRatio?: string
       draftType?: ArticleDraftType
       platforms?: string[]
       plannerModel?: string
@@ -558,12 +589,14 @@ export class DraftGenerationService {
   ): Promise<{ consumedPoints: number }> {
     const existingAiLog = await this.aiLogRepository.getById(aiLogId)
     const existing = (existingAiLog?.response ?? {}) as ArticleDraftResponse
-    const consumedPoints = existingAiLog?.points ?? 0
+    let consumedPoints = existingAiLog?.points ?? 0
     const startTime = Date.now()
     const draftType = options.draftType ?? 'article'
     let resolvedPlannerModel = existingAiLog?.model ?? options.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
 
     try {
+      const referenceImageUrls = options.imageUrls ?? []
+      const targetImageCount = options.imageModel ? options.imageCount ?? 3 : 0
       let plan = existing.plan
       if (plan) {
         this.logger.log({ aiLogId }, 'Article: Reusing plan from previous attempt')
@@ -579,7 +612,12 @@ export class DraftGenerationService {
           userPrompt: options.prompt,
           captionPrompt: options.captionPrompt,
           memoryItems,
+          referenceImageUrls,
           platforms: options.platforms,
+          imageModel: options.imageModel,
+          imageCount: targetImageCount,
+          imageSize: options.imageSize,
+          aspectRatio: options.aspectRatio,
         })
         plan = planned.plan
         resolvedPlannerModel = planned.model
@@ -594,6 +632,76 @@ export class DraftGenerationService {
         )
       }
 
+      let generatedImageUrls = targetImageCount > 0 ? (existing.imageUrls ?? []).slice(0, targetImageCount) : []
+      let imageGenerationErrors = existing.imageGenerationErrors ?? []
+
+      if (targetImageCount > 0 && options.imageModel) {
+        const imageExecution = this.resolveImageExecution(options.imageModel, referenceImageUrls, options.aspectRatio)
+        const fallbackImagePrompt = `${plan.title}\n\n${plan.description}`.slice(0, 1000)
+        const imagePromptTasks = Array.from({ length: targetImageCount }, (_, promptIndex) => ({
+          prompt: plan.imagePrompts?.[promptIndex] ?? plan.imagePrompts?.[0] ?? fallbackImagePrompt,
+          promptIndex,
+        }))
+
+        const updateImageProgress = async (
+          imageUrls: string[],
+          points: number,
+          errors: ImageGenerationErrorDetail[] = [],
+        ) => {
+          await this.aiLogRepository.updateById(aiLogId, {
+            $set: {
+              'points': points,
+              'response.title': plan.title,
+              'response.description': plan.description,
+              'response.topics': plan.topics,
+              'response.articleHtml': plan.articleHtml,
+              'response.plan': plan,
+              'response.coverUrl': imageUrls[0],
+              'response.imageUrls': [...imageUrls],
+              'response.requestedImageCount': targetImageCount,
+              'response.generatedImageCount': imageUrls.length,
+              'response.imageGenerationErrors': [...errors],
+            },
+          })
+        }
+
+        if (generatedImageUrls.length < targetImageCount) {
+          const missingPromptTasks = imagePromptTasks.slice(generatedImageUrls.length, targetImageCount)
+          const progressImageUrls = [...generatedImageUrls]
+          const { urls, points: imagePoints, imageGenerationErrors: generationErrors } = await this.generateImages(
+            userId,
+            userType,
+            options.imageModel,
+            missingPromptTasks,
+            imageExecution,
+            referenceImageUrls,
+            options.aspectRatio,
+            options.imageSize,
+            async (imageUrl, points, errors) => {
+              if (progressImageUrls.length < targetImageCount) {
+                progressImageUrls.push(imageUrl)
+              }
+              await updateImageProgress(progressImageUrls, consumedPoints + points, [
+                ...imageGenerationErrors,
+                ...errors,
+              ])
+            },
+          )
+
+          generatedImageUrls = progressImageUrls.length > generatedImageUrls.length
+            ? progressImageUrls.slice(0, targetImageCount)
+            : [...generatedImageUrls, ...urls].slice(0, targetImageCount)
+          imageGenerationErrors = [...imageGenerationErrors, ...generationErrors]
+          consumedPoints += imagePoints
+          await updateImageProgress(generatedImageUrls, consumedPoints, imageGenerationErrors)
+
+          if (generatedImageUrls.length < targetImageCount) {
+            throw new Error(`Article: generated ${generatedImageUrls.length}/${targetImageCount} images`)
+          }
+        }
+      }
+
+      const coverUrl = generatedImageUrls[0]
       const materialId = existing.materialId ?? (await this.materialRepository.create({
         userId,
         userType,
@@ -604,7 +712,8 @@ export class DraftGenerationService {
         title: plan.title,
         desc: plan.description,
         topics: plan.topics,
-        mediaList: [],
+        coverUrl,
+        mediaList: generatedImageUrls.map(url => ({ url, type: MediaType.IMG })),
         useCount: 0,
         autoDeleteMedia: false,
         model: resolvedPlannerModel,
@@ -620,7 +729,8 @@ export class DraftGenerationService {
           title: plan.title,
           desc: plan.description,
           topics: plan.topics,
-          imageCount: 0,
+          imageCount: generatedImageUrls.length,
+          aspectRatio: options.aspectRatio,
         }),
       })).id
 
@@ -629,6 +739,11 @@ export class DraftGenerationService {
         title: plan.title,
         description: plan.description,
         topics: plan.topics,
+        coverUrl,
+        imageUrls: generatedImageUrls,
+        requestedImageCount: targetImageCount || undefined,
+        generatedImageCount: targetImageCount > 0 ? generatedImageUrls.length : undefined,
+        imageGenerationErrors,
         articleHtml: plan.articleHtml,
         plan,
       }
