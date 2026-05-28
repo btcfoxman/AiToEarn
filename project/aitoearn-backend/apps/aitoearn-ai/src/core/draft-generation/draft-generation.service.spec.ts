@@ -26,3 +26,19 @@ describe('draftGenerationService OpenAI image size resolution', () => {
     expect(() => service.resolveOpenAIImageSize('4:1')).toThrow('between 1:3 and 3:1')
   })
 })
+
+describe('draftGenerationService pricing models', () => {
+  const service = Object.create(DraftGenerationService.prototype) as unknown as {
+    getDraftGenerationPricing: () => {
+      videoModels: Array<{ name: string }>
+    }
+  }
+
+  it('returns non-Grok video draft models', () => {
+    const pricing = service.getDraftGenerationPricing()
+    const videoModelNames = pricing.videoModels.map(model => model.name)
+
+    expect(videoModelNames).toContain('happyhorse-1.0')
+    expect(videoModelNames.some(name => name.includes('seedance'))).toBe(true)
+  })
+})

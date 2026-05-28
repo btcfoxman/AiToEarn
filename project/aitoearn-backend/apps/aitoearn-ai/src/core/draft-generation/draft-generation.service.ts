@@ -1033,7 +1033,6 @@ export class DraftGenerationService {
     const imageModels = config.ai.draftGeneration.imageModels
 
     const videoModels = config.ai.models.video.generation
-      .filter(v => v.channel === AiLogChannel.Grok)
 
     return { imageModels, videoModels }
   }
