@@ -49,31 +49,42 @@ function normalizeOptionalArticleFeatures(value: unknown): OptionalArticleFeatur
 function withBestEffortArticleFeatures(params: Record<string, unknown>) {
   const nextParams = { ...params }
   const features = new Set<OptionalArticleFeature>([
-    ...normalizeOptionalArticleFeatures(nextParams.requested_features),
-    ...normalizeOptionalArticleFeatures(nextParams.requestedFeatures),
+    ...normalizeOptionalArticleFeatures(nextParams['requested_features']),
+    ...normalizeOptionalArticleFeatures(nextParams['requestedFeatures']),
   ])
 
   features.delete('poll')
   features.delete('wechat_channel_video')
-  if (nextParams.insert_poll === true) {
+  if (nextParams['insert_poll'] === true) {
     features.add('poll')
   }
-  if (nextParams.insert_video_channel === true) {
+  if (nextParams['insert_video_channel'] === true) {
     features.add('wechat_channel_video')
   }
 
   const requestedFeatures = Array.from(features)
-  delete nextParams.requestedFeatures
-  delete nextParams.featurePolicy
+  delete nextParams['requestedFeatures']
+  delete nextParams['featurePolicy']
   if (requestedFeatures.length > 0) {
-    nextParams.requested_features = requestedFeatures
-    nextParams.feature_policy = nextParams.feature_policy || 'best_effort'
+    nextParams['requested_features'] = requestedFeatures
+    nextParams['feature_policy'] = nextParams['feature_policy'] || 'best_effort'
   }
   else {
-    delete nextParams.requested_features
-    delete nextParams.feature_policy
+    delete nextParams['requested_features']
+    delete nextParams['feature_policy']
   }
   return nextParams
+}
+
+function resolveArticleHtml(option?: {
+  orchestration?: { articleHtml?: string }
+  [key: string]: unknown
+}) {
+  const topLevelArticleHtml = option?.['articleHtml']
+  if (typeof topLevelArticleHtml === 'string' && topLevelArticleHtml) {
+    return topLevelArticleHtml
+  }
+  return option?.orchestration?.articleHtml
 }
 
 @Injectable()
@@ -103,7 +114,7 @@ export class OrchestrationPublishService extends PublishService {
     if (!contentType) {
       return { success: false, message: 'Unsupported orchestration content type' }
     }
-    const articleHtml = publishTask.option?.articleHtml || publishTask.option?.orchestration?.articleHtml
+    const articleHtml = resolveArticleHtml(publishTask.option)
     if (!publishTask.desc && !articleHtml) {
       return { success: false, message: 'Content body is required' }
     }
@@ -149,7 +160,7 @@ export class OrchestrationPublishService extends PublishService {
     const platform = publishTask.accountType === AccountType.WxGzh ? AccountType.WxGzh : AccountType.Toutiao
     const publishTargetId = publishTask.option?.orchestration?.publishTargetId || account.externalId || account.uid
     const orchestrationParams = withBestEffortArticleFeatures(publishTask.option?.orchestration?.params || {})
-    const articleHtml = publishTask.option?.articleHtml || publishTask.option?.orchestration?.articleHtml
+    const articleHtml = resolveArticleHtml(publishTask.option)
     const response = await this.orchestrationClient.createPublishTask({
       business_system: 'aitoearn',
       request_id: requestId,
