@@ -10,6 +10,7 @@ import { Info } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { PubParamsVerifyInfo } from '@/components/PublishDialog/hooks/usePubParamsVerify'
+import { isArticlePublishItem } from '@/components/PublishDialog/PublishDialog.util'
 import { usePublishDialog } from '@/components/PublishDialog/usePublishDialog'
 import { parseTopicString } from '@/utils'
 
@@ -40,7 +41,9 @@ export default function usePlatParamsCommon(
 
   const onChange = useCallback(
     (values: IChangeParams) => {
-      const { topics } = parseTopicString(values.value || '')
+      const { topics } = isArticlePublishItem(pubItem)
+        ? { topics: [] }
+        : parseTopicString(values.value || '')
       setOnePubParams(
         {
           images: values.imgs,
@@ -63,6 +66,7 @@ export default function usePlatParamsCommon(
       videoFileValue: pubItem.params.video,
       onImageToImage,
       isMobile,
+      enableTopicMentions: !isArticlePublishItem(pubItem),
       beforeExtend: (
         <>
           <PubParamsVerifyInfo errItem={currErrItem} />

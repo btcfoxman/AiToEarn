@@ -21,6 +21,10 @@ import { useCalendarTiming } from '@/app/[lng]/accounts/components/CalendarTimin
 import { AccountStatus } from '@/app/config/accountConfig'
 import { AccountPlatInfoMap, PlatType } from '@/app/config/platConfig'
 import { PubType } from '@/app/config/publishConfig'
+import {
+  getPublishItemSupportedContentTypes,
+  isArticlePublishItem,
+} from '@/components/PublishDialog/PublishDialog.util'
 import { usePublishDialogStorageStore } from '@/components/PublishDialog/usePublishDialogStorageStore'
 import { toast } from '@/lib/toast'
 import { PlatformTaskStatus, PLUGIN_SUPPORTED_PLATFORMS, usePluginStore } from '@/store/plugin'
@@ -82,7 +86,7 @@ function normalizePublishOption(item: PubItem) {
   }
 
   if (item.account.externalProvider === 'ai-orchestration') {
-    const supportedContentTypes = item.account.externalMeta?.capabilities?.contentTypes ?? []
+    const supportedContentTypes = getPublishItemSupportedContentTypes(item)
     const requestedContentType = option.orchestration?.contentType
     let contentType = requestedContentType
 
@@ -222,8 +226,15 @@ export function usePublishActions({
     // 1. 先执行 API 发布（非插件支持平台）
     for (const item of apiPublishItems) {
       const normalizedOption = normalizePublishOption(item)
+      const isArticleContent = isArticlePublishItem({
+        ...item,
+        params: {
+          ...item.params,
+          option: normalizedOption,
+        },
+      })
       const res = await apiCreatePublish({
-        topics: item.params.topics ?? [],
+        topics: isArticleContent ? [] : (item.params.topics ?? []),
         flowId: generateUUID(),
         type: item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
         title: item.params.title || '',

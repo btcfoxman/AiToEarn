@@ -27,6 +27,7 @@ import { usePlatformAuth } from '@/components/PublishDialog/hooks/usePlatformAut
 import { usePublishActions } from '@/components/PublishDialog/hooks/usePublishActions'
 import usePubParamsVerify from '@/components/PublishDialog/hooks/usePubParamsVerify'
 import { useValidatedPublishTrigger } from '@/components/PublishDialog/hooks/useValidatedPublishTrigger'
+import { isArticlePublishItem } from '@/components/PublishDialog/PublishDialog.util'
 import { usePublishDialog } from '@/components/PublishDialog/usePublishDialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -472,7 +473,10 @@ const MobilePublishContent = memo(
                     videoFileValue={commonPubParams.video}
                     imageFileListValue={commonPubParams.images}
                     onChange={(values) => {
-                      const { topics } = parseTopicString(values.value || '')
+                      const shouldParseTopics = pubListChoosed.some(item => !isArticlePublishItem(item))
+                      const { topics } = shouldParseTopics
+                        ? parseTopicString(values.value || '')
+                        : { topics: [] }
                       setAccountAllParams({
                         des: values.value,
                         images: values.imgs,
@@ -482,6 +486,7 @@ const MobilePublishContent = memo(
                     }}
                     onImageToImage={handleImageToImage}
                     isMobile
+                    enableTopicMentions={pubListChoosed.some(item => !isArticlePublishItem(item))}
                   />
                 )}
               </>

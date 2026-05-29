@@ -1,5 +1,11 @@
 import type { SocialAccount } from '@/api/types/account.type'
-import type { IImgFile, IVideoFile } from '@/components/PublishDialog/publishDialog.type'
+import type {
+  IImgFile,
+  IVideoFile,
+  OrchestrationPublishContentType,
+  PubItem,
+} from '@/components/PublishDialog/publishDialog.type'
+import { PlatType } from '@/app/config/platConfig'
 import { generateUUID, getFilePathName } from '@/utils'
 import { getOssUrl } from '@/utils/oss'
 
@@ -50,6 +56,70 @@ export function debugPublishDialog(message: string, payload?: unknown) {
   }
 
   console.info(`[PublishDialog] ${message} ${payloadText}`)
+}
+
+function isOrchestrationContentType(value: unknown): value is OrchestrationPublishContentType {
+  return value === 'image_text' || value === 'article' || value === 'weitoutiao'
+}
+
+function normalizeContentTypes(value: unknown): OrchestrationPublishContentType[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter(isOrchestrationContentType)
+}
+
+export function getPublishItemOrchestrationContentType(pubItem: PubItem): OrchestrationPublishContentType | undefined {
+  const contentTypes = getPublishItemSupportedContentTypes(pubItem)
+  const selected = pubItem.params.option.orchestration?.contentType
+
+  if (isOrchestrationContentType(selected) && (contentTypes.length === 0 || contentTypes.includes(selected))) {
+    return selected
+  }
+
+  if (pubItem.account.externalProvider !== 'ai-orchestration' && contentTypes.length === 0) {
+    return undefined
+  }
+
+  if (
+    pubItem.account.type === PlatType.WxGzh
+    && pubItem.params.images?.length
+    && contentTypes.includes('image_text')
+  ) {
+    return 'image_text'
+  }
+
+  if (pubItem.account.type === PlatType.Toutiao && contentTypes.includes('article')) {
+    return 'article'
+  }
+
+  if (contentTypes.includes('article')) {
+    return 'article'
+  }
+
+  return contentTypes[0]
+}
+
+export function getPublishItemSupportedContentTypes(pubItem: PubItem): OrchestrationPublishContentType[] {
+  const externalMeta = pubItem.account.externalMeta as Record<string, unknown> | undefined
+  const capabilities = externalMeta?.capabilities as Record<string, unknown> | undefined
+  const targetSnapshot = externalMeta?.targetSnapshot as Record<string, unknown> | undefined
+  const targetCapabilities = targetSnapshot?.capabilities as Record<string, unknown> | undefined
+  return normalizeContentTypes(
+    capabilities?.contentTypes ?? targetCapabilities?.contentTypes ?? targetSnapshot?.contentTypes,
+  )
+}
+
+export function isArticlePublishItem(pubItem: PubItem): boolean {
+  return getPublishItemOrchestrationContentType(pubItem) === 'article'
+}
+
+export function isArticlePublishOption(option: unknown): boolean {
+  const source = option && typeof option === 'object' ? option as Record<string, unknown> : {}
+  const orchestration = source.orchestration && typeof source.orchestration === 'object'
+    ? source.orchestration as Record<string, unknown>
+    : {}
+  return orchestration.contentType === 'article'
 }
 
 export async function formatVideo(file: File): Promise<IVideoFile> {

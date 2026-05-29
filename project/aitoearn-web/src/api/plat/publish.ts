@@ -6,6 +6,7 @@ import type {
 } from '@/api/plat/types/publish.types'
 import type { PlatType } from '@/app/config/platConfig'
 import type { IPlatOption } from '@/components/PublishDialog/publishDialog.type'
+import { isArticlePublishOption } from '@/components/PublishDialog/PublishDialog.util'
 import { parseTopicString } from '@/utils'
 import { request } from '@/utils/request'
 
@@ -41,9 +42,14 @@ export function updatePublishRecordLinkApi(data: UpdatePublishRecordLinkParams) 
 
 // 创建发布任务
 export function apiCreatePublish(data: PublishParams) {
-  const { topics, cleanedString } = parseTopicString(data.desc || '')
-  data.topics = [...new Set(data.topics?.concat(topics))]
-  data.desc = cleanedString
+  if (!isArticlePublishOption(data.option)) {
+    const { topics, cleanedString } = parseTopicString(data.desc || '')
+    data.topics = [...new Set((data.topics ?? []).concat(topics))]
+    data.desc = cleanedString
+  }
+  else {
+    data.topics = data.topics ?? []
+  }
 
   // 根据accountType过滤option参数
   data.option = filterOptionByPlatform(data.option, data.accountType)

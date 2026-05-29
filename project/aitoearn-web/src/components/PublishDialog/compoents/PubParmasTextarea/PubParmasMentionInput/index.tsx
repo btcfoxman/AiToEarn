@@ -42,6 +42,7 @@ export interface IPubParmasMentionInputProps {
   value: string
   placeholder: string
   maxLength: number
+  enableTopicMentions?: boolean
 }
 
 const mentionItems = {
@@ -104,7 +105,7 @@ function CompositionSyncPlugin({
 const PubParmasMentionInput = memo(
   forwardRef(
     (
-      { onChange, value, placeholder, maxLength }: IPubParmasMentionInputProps,
+      { onChange, value, placeholder, maxLength, enableTopicMentions = true }: IPubParmasMentionInputProps,
       ref: ForwardedRef<IPubParmasMentionInputRef>,
     ) => {
       const comboboxAnchor = useRef<HTMLDivElement>(null)
@@ -171,12 +172,16 @@ const PubParmasMentionInput = memo(
             <HistoryPlugin />
             <AutoFocusPlugin defaultSelection="rootStart" />
 
-            <InitialValuePlugin value={value} lastOutputValueRef={lastOutputValueRef} />
+            <InitialValuePlugin
+              value={value}
+              lastOutputValueRef={lastOutputValueRef}
+              enableTopicMentions={enableTopicMentions}
+            />
             <CompositionSyncPlugin onChange={onChange} lastOutputValueRef={lastOutputValueRef} />
 
-            <PasteTopicsPlugin />
+            {enableTopicMentions && <PasteTopicsPlugin />}
 
-            <BeautifulMentionsPlugin {...beautifulMentionsProps} />
+            {enableTopicMentions && <BeautifulMentionsPlugin {...beautifulMentionsProps} />}
           </LexicalComposer>
         </div>
       )

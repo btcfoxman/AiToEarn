@@ -117,7 +117,8 @@ function DraftContentModule({
     if (!publishingDraft)
       return undefined
     const isVideo = publishingDraft.mediaList?.some(m => m.type === 'video')
-    const targetPubType = isVideo ? PubType.VIDEO : PubType.ImageText
+    const isArticleDraft = publishingDraft.generationParams?.draftType === 'article'
+    const targetPubType = isVideo ? PubType.VIDEO : isArticleDraft ? PubType.Article : PubType.ImageText
 
     return accountList
       .filter((acc) => {
@@ -139,16 +140,29 @@ function DraftContentModule({
 
       store.setPrefillLoading(true)
 
+      const isArticleDraft = publishingDraft.generationParams?.draftType === 'article'
       const params: Partial<IPubParams> = {
         des: publishingDraft.desc || '',
         title: publishingDraft.title || '',
-        topics: publishingDraft.topics,
+        topics: isArticleDraft ? [] : publishingDraft.topics,
       }
 
       // 将话题拼接到描述末尾，以便 Lexical 编辑器渲染为 mention 节点
-      if (publishingDraft.topics?.length) {
+      if (!isArticleDraft && publishingDraft.topics?.length) {
         const topicStr = publishingDraft.topics.map(t => `#${t}`).join(' ')
         params.des = `${params.des || ''}\n${topicStr}`.trim()
+      }
+
+      if (isArticleDraft) {
+        const articleHtml = typeof publishingDraft.option?.articleHtml === 'string'
+          ? publishingDraft.option.articleHtml
+          : undefined
+        params.option = {
+          orchestration: {
+            contentType: 'article',
+            ...(articleHtml ? { articleHtml } : {}),
+          },
+        }
       }
 
       const videoMedia = publishingDraft.mediaList?.find(m => m.type === 'video')
