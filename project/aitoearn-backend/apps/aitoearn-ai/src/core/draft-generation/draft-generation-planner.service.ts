@@ -351,7 +351,26 @@ ${imageOutputRequirement}`
     referenceVideoUrls: string[] = [],
   ): Promise<T> {
     const model = this.createPlannerModel(modelConfig)
-    const messages = this.buildMessages(prompt, referenceImageUrls, referenceVideoUrls)
+    const useTextJsonPlanner = this.shouldUseTextJsonPlanner(modelConfig)
+    const messages = this.buildMessages(
+      useTextJsonPlanner ? this.withJsonResponseInstruction(prompt) : prompt,
+      referenceImageUrls,
+      referenceVideoUrls,
+    )
+    if (useTextJsonPlanner) {
+      const { text } = await this.aiAvailability.execute(
+        { provider: modelConfig.channel, operation: 'draftGeneration.planner', model: modelConfig.name },
+        async () => await generateText({
+          model,
+          messages,
+          maxRetries: 1,
+          temperature: 0.4,
+        }),
+      )
+
+      return this.parsePlannerJson(text, schema)
+    }
+
     const { output } = await this.aiAvailability.execute(
       { provider: modelConfig.channel, operation: 'draftGeneration.planner', model: modelConfig.name },
       async () => await generateText({
@@ -364,6 +383,90 @@ ${imageOutputRequirement}`
     )
 
     return output
+  }
+
+  private shouldUseTextJsonPlanner(modelConfig: PlannerModelConfig): boolean {
+    return modelConfig.channel === AiLogChannel.OpenAI && /^claude-/i.test(modelConfig.name)
+  }
+
+  private withJsonResponseInstruction(prompt: string): string {
+    return `${prompt}
+
+## Required Response Format
+Return exactly one valid JSON object and nothing else.
+- Do not wrap the response in Markdown fences.
+- Do not include explanatory text before or after the JSON.
+- The response must be parseable by JSON.parse.
+- Use double quotes for JSON keys and string values.
+- Escape double quotes and newlines inside string values.
+- Use arrays for list fields such as topics and imagePrompts.
+- Do not include trailing commas.`
+  }
+
+  private parsePlannerJson<T extends Record<string, unknown>>(text: string, schema: z.ZodType<T>): T {
+    const candidates = [
+      text.trim(),
+      this.extractMarkdownJson(text),
+      this.extractFirstJsonObject(text),
+    ].filter((candidate): candidate is string => Boolean(candidate?.trim()))
+
+    let lastParseError: unknown
+    for (const candidate of candidates) {
+      try {
+        return schema.parse(JSON.parse(candidate))
+      }
+      catch (error) {
+        lastParseError = error
+      }
+    }
+
+    const detail = lastParseError instanceof Error ? `: ${lastParseError.message}` : ''
+    throw new Error(`Planner model did not return valid JSON${detail}`)
+  }
+
+  private extractMarkdownJson(text: string): string | undefined {
+    return text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim()
+  }
+
+  private extractFirstJsonObject(text: string): string | undefined {
+    const start = text.indexOf('{')
+    if (start === -1) {
+      return undefined
+    }
+
+    let depth = 0
+    let inString = false
+    let escaping = false
+    for (let index = start; index < text.length; index++) {
+      const char = text[index]
+      if (inString) {
+        if (escaping) {
+          escaping = false
+        }
+        else if (char === '\\') {
+          escaping = true
+        }
+        else if (char === '"') {
+          inString = false
+        }
+        continue
+      }
+
+      if (char === '"') {
+        inString = true
+      }
+      else if (char === '{') {
+        depth++
+      }
+      else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          return text.slice(start, index + 1)
+        }
+      }
+    }
+
+    return undefined
   }
 
   private buildMessages(prompt: string, referenceImageUrls: string[], referenceVideoUrls: string[]): ModelMessage[] {
