@@ -145,60 +145,10 @@ jobs:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
-      ARCHIVE_PROXY_URLS: "http://127.0.0.1:10809 http://xray:10809 direct"
     steps:
-      - name: Download repository archive
-        env:
-          ARCHIVE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          work_dir="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}"
-          archive_path="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}.tar.gz"
-          rm -rf "${work_dir}"
-          mkdir -p "${work_dir}"
-
-          archive_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}"
-          for i in 1 2 3 4 5; do
-            for proxy_url in ${ARCHIVE_PROXY_URLS}; do
-              rm -f "${archive_path}"
-              proxy_args=()
-              proxy_label="direct"
-              if [ "${proxy_url}" != "direct" ]; then
-                proxy_args=(--proxy "${proxy_url}")
-                proxy_label="${proxy_url}"
-              fi
-
-              echo "Downloading repository archive via ${proxy_label} (attempt ${i})"
-              if curl --fail --location --silent --show-error \
-                --connect-timeout 15 \
-                --max-time 120 \
-                --speed-limit 1024 \
-                --speed-time 60 \
-                --retry 2 \
-                --retry-delay 5 \
-                ${proxy_args[@]+"${proxy_args[@]}"} \
-                -H "Authorization: Bearer ${ARCHIVE_TOKEN}" \
-                -H "Accept: application/vnd.github+json" \
-                "${archive_url}" \
-                -o "${archive_path}" \
-                && tar -tzf "${archive_path}" >/dev/null 2>&1; then
-                echo "Repository archive downloaded via ${proxy_label}"
-                break 2
-              fi
-            done
-
-            if [ "${i}" -eq 5 ]; then
-              exit 1
-            fi
-            sleep $((i * 10))
-          done
-
-          tar -xzf "${archive_path}" --strip-components=1 -C "${work_dir}"
-          rm -f "${archive_path}"
-          echo "REPO_WORK_DIR=${work_dir}" >> "${GITHUB_ENV}"
+      - uses: actions/checkout@v4
 
       - name: Deploy
         run: |
           set -euo pipefail
-          cd "${REPO_WORK_DIR}"
           bash test/deploy.sh
