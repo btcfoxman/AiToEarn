@@ -83,7 +83,7 @@ interface DraftCardProps {
 // 草稿卡片组件（小红书风格）
 const DraftCard = memo(({ material, onClick, batchMode, selected, onToggleSelect, useCountLabel }: DraftCardProps) => {
   const { t } = useTransClient('brandPromotion')
-  const coverUrl = material.coverUrl || '/images/placeholder.png'
+  const coverUrl = material.coverUrl || ''
 
   const handleClick = useCallback(() => {
     if (batchMode) {
