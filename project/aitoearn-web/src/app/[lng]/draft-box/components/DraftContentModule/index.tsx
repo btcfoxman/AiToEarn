@@ -7,6 +7,7 @@
 'use client'
 
 import type { DraftListSectionTab } from '../DraftListSection'
+import type { PromotionMaterial } from '@/app/[lng]/brand-promotion/brandPromotionStore/types'
 import type { IPubParams } from '@/components/PublishDialog/publishDialog.type'
 import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo } from 'react'
@@ -44,6 +45,45 @@ interface DraftContentModuleProps {
   showVideoCreateDraftTaskWidget?: boolean
   /** 内容区域外层样式 */
   contentClassName?: string
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
+
+function resolveArticleHtml(option?: Record<string, unknown>): string | undefined {
+  const directHtml = option?.articleHtml
+  if (typeof directHtml === 'string' && directHtml.trim())
+    return directHtml
+
+  const article = asRecord(option?.article)
+  const articleHtml = article?.html
+  if (typeof articleHtml === 'string' && articleHtml.trim())
+    return articleHtml
+
+  const orchestration = asRecord(option?.orchestration)
+  const orchestrationHtml = orchestration?.articleHtml
+  if (typeof orchestrationHtml === 'string' && orchestrationHtml.trim())
+    return orchestrationHtml
+
+  return undefined
+}
+
+function isArticleMaterial(material?: PromotionMaterial | null): boolean {
+  if (!material)
+    return false
+  if (material.generationParams?.draftType === 'article')
+    return true
+  const option = material.option
+  if (resolveArticleHtml(option))
+    return true
+  const article = asRecord(option?.article)
+  if (article)
+    return true
+  const orchestration = asRecord(option?.orchestration)
+  return orchestration?.contentType === 'article'
 }
 
 function DraftContentModule({
@@ -117,7 +157,7 @@ function DraftContentModule({
     if (!publishingDraft)
       return undefined
     const isVideo = publishingDraft.mediaList?.some(m => m.type === 'video')
-    const isArticleDraft = publishingDraft.generationParams?.draftType === 'article'
+    const isArticleDraft = isArticleMaterial(publishingDraft)
     const targetPubType = isVideo ? PubType.VIDEO : isArticleDraft ? PubType.Article : PubType.ImageText
 
     return accountList
@@ -140,7 +180,7 @@ function DraftContentModule({
 
       store.setPrefillLoading(true)
 
-      const isArticleDraft = publishingDraft.generationParams?.draftType === 'article'
+      const isArticleDraft = isArticleMaterial(publishingDraft)
       const params: Partial<IPubParams> = {
         des: publishingDraft.desc || '',
         title: publishingDraft.title || '',
@@ -154,9 +194,7 @@ function DraftContentModule({
       }
 
       if (isArticleDraft) {
-        const articleHtml = typeof publishingDraft.option?.articleHtml === 'string'
-          ? publishingDraft.option.articleHtml
-          : undefined
+        const articleHtml = resolveArticleHtml(publishingDraft.option)
         params.option = {
           orchestration: {
             contentType: 'article',

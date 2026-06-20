@@ -78,11 +78,15 @@ function withBestEffortArticleFeatures(params: Record<string, unknown>) {
 
 function resolveArticleHtml(option?: {
   orchestration?: { articleHtml?: string }
+  article?: { html?: string, body?: string }
   [key: string]: unknown
 }) {
   const topLevelArticleHtml = option?.['articleHtml']
   if (typeof topLevelArticleHtml === 'string' && topLevelArticleHtml) {
     return topLevelArticleHtml
+  }
+  if (typeof option?.article?.html === 'string' && option.article.html) {
+    return option.article.html
   }
   return option?.orchestration?.articleHtml
 }
