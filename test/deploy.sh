@@ -71,6 +71,20 @@ ensure_rustfs_bucket() {
   fi
 }
 
+ensure_auto_login_token() {
+  if docker run --rm -v aitoearn-test-init-data:/data/init node:lts-alpine sh -c 'test -s /data/init/token.txt' >/dev/null 2>&1; then
+    log "Auto-login token already exists"
+    return 0
+  fi
+
+  log "Auto-login token missing; running init once"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 180 docker compose -f "${COMPOSE_FILE}" run --rm aitoearn-init
+  else
+    docker compose -f "${COMPOSE_FILE}" run --rm aitoearn-init
+  fi
+}
+
 if [ ! -d "${APP_DIR}" ]; then
   mkdir -p "${APP_DIR}"
 fi
@@ -129,7 +143,10 @@ for service in aitoearn-init nginx; do
 done
 
 log "Starting services"
-docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans
+ensure_auto_login_token
+docker compose -f "${COMPOSE_FILE}" stop aitoearn-init >/dev/null 2>&1 || true
+docker compose -f "${COMPOSE_FILE}" rm -f aitoearn-init >/dev/null 2>&1 || true
+docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans aitoearn-ai aitoearn-server aitoearn-web nginx
 
 log "Waiting for nginx health"
 for i in $(seq 1 30); do
