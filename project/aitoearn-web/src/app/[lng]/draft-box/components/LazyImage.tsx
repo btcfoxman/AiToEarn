@@ -6,6 +6,7 @@
 'use client'
 
 import type { ImageProps } from 'next/image'
+import { ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { memo, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,15 +32,19 @@ export const LazyImage = memo(({
 }: LazyImageProps) => {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
+  const hasRenderableSrc = typeof src !== 'string' || src.trim().length > 0
+  const showFallback = error || !hasRenderableSrc
 
   const handleLoad = () => {
-    setLoaded(true)
+    setLoaded(prev => prev || true)
   }
 
   const handleError = () => {
-    setError(true)
-    setLoaded(true)
+    setError(prev => prev || true)
+    setLoaded(prev => prev || true)
   }
+
+  const fallbackStyle = placeholderHeight ? { minHeight: placeholderHeight } : undefined
 
   return (
     <div
@@ -57,18 +62,34 @@ export const LazyImage = memo(({
       )}
 
       {/* 图片 */}
-      <Image
-        src={error ? '/images/placeholder.png' : src}
-        alt={alt}
-        className={cn(
-          'transition-opacity duration-300',
-          loaded ? 'opacity-100' : 'opacity-0',
-          className,
-        )}
-        onLoad={handleLoad}
-        onError={handleError}
-        {...props}
-      />
+      {showFallback
+        ? (
+            <div
+              role="img"
+              aria-label={typeof alt === 'string' ? alt : undefined}
+              className={cn(
+                'flex w-full items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground',
+                className,
+              )}
+              style={fallbackStyle}
+            >
+              <ImageIcon className="h-8 w-8 opacity-60" />
+            </div>
+          )
+        : (
+            <Image
+              src={src}
+              alt={alt}
+              className={cn(
+                'transition-opacity duration-300',
+                loaded ? 'opacity-100' : 'opacity-0',
+                className,
+              )}
+              onLoad={handleLoad}
+              onError={handleError}
+              {...props}
+            />
+          )}
     </div>
   )
 })
