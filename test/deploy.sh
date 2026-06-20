@@ -11,6 +11,23 @@ log() {
   printf '[aitoearn-deploy] %s\n' "$*"
 }
 
+retry() {
+  local attempts="$1"
+  local delay="$2"
+  shift 2
+  local i
+  for i in $(seq 1 "${attempts}"); do
+    if "$@"; then
+      return 0
+    fi
+    if [ "${i}" -eq "${attempts}" ]; then
+      return 1
+    fi
+    log "Command failed, retrying in ${delay}s (${i}/${attempts}): $*"
+    sleep "${delay}"
+  done
+}
+
 read_env_value() {
   local key="$1"
   local file="$2"
@@ -91,10 +108,12 @@ fi
 
 log "Validating compose config"
 cd "${APP_DIR}"
+export IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/btcfoxman/aitoearn}"
+export IMAGE_TAG="${IMAGE_TAG:-test-latest}"
 docker compose config >/dev/null
 
 log "Pulling images"
-docker compose pull
+retry 5 10 docker compose pull
 
 log "Starting services"
 docker compose up -d --remove-orphans
