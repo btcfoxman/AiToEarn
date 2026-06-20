@@ -110,18 +110,18 @@ log "Validating compose config"
 cd "${APP_DIR}"
 export IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/btcfoxman/aitoearn}"
 export IMAGE_TAG="${IMAGE_TAG:-test-latest}"
-docker compose config >/dev/null
+docker compose -f "${COMPOSE_FILE}" config >/dev/null
 
 log "Pulling images"
-retry 5 10 docker compose pull
+retry 5 10 docker compose -f "${COMPOSE_FILE}" pull
 
 log "Starting services"
-docker compose up -d --remove-orphans
+docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans
 
 log "Waiting for nginx health"
 for i in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:${APP_PORT:-8081}/_nhealth" >/dev/null; then
-    docker compose ps
+    docker compose -f "${COMPOSE_FILE}" ps
     log "Deployment complete"
     exit 0
   fi
@@ -129,6 +129,6 @@ for i in $(seq 1 30); do
 done
 
 log "Health check failed"
-docker compose ps || true
-docker compose logs --tail=200 nginx aitoearn-web aitoearn-server aitoearn-ai || true
+docker compose -f "${COMPOSE_FILE}" ps || true
+docker compose -f "${COMPOSE_FILE}" logs --tail=200 nginx aitoearn-web aitoearn-server aitoearn-ai || true
 exit 1
