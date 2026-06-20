@@ -147,9 +147,10 @@ export async function apiGetMaterialList(groupId: string, pageNo: number, pageSi
   const list = res?.data?.list
   // 兼容代码，图文草稿补封面
   if (list && list.length > 0) {
-    list.map((item) => {
-      if (item.mediaList[0].type === 'img') {
-        item.coverUrl = item.mediaList[0].url
+    list.forEach((item) => {
+      const firstMedia = Array.isArray(item.mediaList) ? item.mediaList[0] : undefined
+      if (!item.coverUrl && firstMedia?.type === 'img' && firstMedia.url) {
+        item.coverUrl = firstMedia.url
       }
     })
   }

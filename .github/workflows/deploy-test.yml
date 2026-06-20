@@ -201,4 +201,4 @@ jobs:
         run: |
           set -euo pipefail
           cd "${REPO_WORK_DIR}"
-          bash deploy/test/deploy.sh
+          bash test/deploy.sh

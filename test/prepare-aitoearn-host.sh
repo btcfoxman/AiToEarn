@@ -130,7 +130,7 @@ fi
 echo
 echo "Done."
 echo "Next steps:"
-echo "  1. Copy deploy/test files to ${APP_DIR} or run deploy/test/deploy.sh from a repository checkout."
-echo "  2. Create ${APP_DIR}/.env from deploy/test/.env.example and fill secrets."
+echo "  1. Copy test files to ${APP_DIR} or run test/deploy.sh from a repository checkout."
+echo "  2. Create ${APP_DIR}/.env from test/.env.example and fill secrets."
 echo "  3. Register runner:"
-echo "     sudo bash deploy/test/configure-aitoearn-runner.sh <github-runner-token>"
+echo "     sudo bash test/configure-aitoearn-runner.sh <github-runner-token>"

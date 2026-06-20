@@ -8,6 +8,7 @@ import { UserModule } from '../user/user.module'
 import { AccountController } from './account.controller'
 import { MaterialInternalController } from './material.controller'
 import { NotificationInternalController } from './notification.controller'
+import { OrchestrationDraftInternalController } from './orchestration-draft.controller'
 import { AccountInternalService } from './provider/account.service'
 import { PublishingInternalService } from './provider/publishing.service'
 import { PublishRecordController } from './publish-record.controller'
@@ -31,6 +32,7 @@ import { UserInternalController } from './user.controller'
     NotificationInternalController,
     PublishingController,
     MaterialInternalController,
+    OrchestrationDraftInternalController,
     PublishRecordController,
     ShortLinkController,
   ],

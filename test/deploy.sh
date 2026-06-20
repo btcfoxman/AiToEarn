@@ -4,7 +4,7 @@ set -euo pipefail
 APP_USER="${APP_USER:-btcfoxman}"
 APP_DIR="${APP_DIR:-/home/btcfoxman/docker/aitoearn}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
 
 log() {
