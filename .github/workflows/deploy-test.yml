@@ -11,6 +11,7 @@ permissions:
   packages: write
 
 env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   IMAGE_TAG_LATEST: test-latest
   BACKEND_DIR: project/aitoearn-backend
   WEB_DIR: project/aitoearn-web
