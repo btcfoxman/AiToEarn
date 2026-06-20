@@ -116,7 +116,17 @@ export IMAGE_TAG="${IMAGE_TAG:-test-latest}"
 docker compose -f "${COMPOSE_FILE}" config >/dev/null
 
 log "Pulling images"
-retry 5 10 docker compose -f "${COMPOSE_FILE}" pull
+pull_attempts="${PULL_ATTEMPTS:-12}"
+pull_delay="${PULL_DELAY:-20}"
+for service in aitoearn-ai aitoearn-server aitoearn-web; do
+  retry "${pull_attempts}" "${pull_delay}" docker compose -f "${COMPOSE_FILE}" pull "${service}"
+done
+
+for service in aitoearn-init nginx; do
+  if ! retry 5 "${pull_delay}" docker compose -f "${COMPOSE_FILE}" pull "${service}"; then
+    log "WARN: failed to refresh ${service}; continuing with the local image if present"
+  fi
+done
 
 log "Starting services"
 docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans
