@@ -35,6 +35,17 @@ read_env_value() {
   awk -F= -v key="${key}" '$1 == key { print substr($0, length(key) + 2) }' "${file}" | tail -n1 | tr -d '"\r'
 }
 
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+  if grep -q "^${key}=" "${file}"; then
+    sed -i "s#^${key}=.*#${key}=${value}#" "${file}"
+  else
+    printf '\n%s=%s\n' "${key}" "${value}" >> "${file}"
+  fi
+}
+
 ensure_rustfs_bucket() {
   local env_file="$1"
   local bucket="$2"
@@ -105,6 +116,7 @@ if [ ! -f "${APP_DIR}/.env" ]; then
 fi
 
 chmod 600 "${APP_DIR}/.env"
+set_env_value AI_ORCHESTRATION_API_URL "${AI_ORCHESTRATION_API_URL:-http://192.168.3.6:8000}" "${APP_DIR}/.env"
 
 rustfs_bucket="$(read_env_value RUSTFS_BUCKET "${APP_DIR}/.env")"
 rustfs_bucket="${rustfs_bucket:-aitoearn-test}"
