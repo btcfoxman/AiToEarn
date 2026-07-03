@@ -12,6 +12,7 @@ import threadsSvg from '@/assets/svgs/plat/threads.png'
 import tiktokSvg from '@/assets/svgs/plat/tiktok.svg'
 import toutiaoSvg from '@/assets/svgs/plat/toutiao.svg'
 import twitterSvg from '@/assets/svgs/plat/twitter.png'
+import wxPyqSvg from '@/assets/svgs/plat/wx-pyq.svg'
 import wxSphSvg from '@/assets/svgs/plat/wx-sph.svg'
 import xhsSvg from '@/assets/svgs/plat/xhs.svg'
 import youtubeSvg from '@/assets/svgs/plat/youtube.png'
@@ -308,7 +309,7 @@ export const AccountPlatInfoMap = new Map<PlatType, IAccountPlatInfo>([
     PlatType.WechatMoments,
     {
       name: '朋友圈',
-      icon: gzhSvg,
+      icon: wxPyqSvg,
       url: 'https://weixin.qq.com/',
       pubTypes: new Set([PubType.ImageText]),
       commonPubParamsConfig: {
