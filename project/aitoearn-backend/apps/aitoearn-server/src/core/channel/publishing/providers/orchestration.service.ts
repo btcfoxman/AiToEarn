@@ -122,7 +122,7 @@ export class OrchestrationPublishService extends PublishService {
     if (!publishTask.desc && !articleHtml) {
       return { success: false, message: 'Content body is required' }
     }
-    if (contentType !== 'weitoutiao' && !publishTask.title) {
+    if (publishTask.accountType !== AccountType.WechatMoments && contentType !== 'weitoutiao' && !publishTask.title) {
       return { success: false, message: 'Title is required' }
     }
     const externalMeta = account.externalMeta || {}
@@ -161,7 +161,10 @@ export class OrchestrationPublishService extends PublishService {
     const imageUrls = (publishTask.imgUrlList || []).map(url => this.buildAssetUrl(url)).filter(Boolean)
     const coverUrl = publishTask.coverUrl ? this.buildAssetUrl(publishTask.coverUrl) : undefined
     const requestId = `aitoearn:${publishTask.id}`
-    const platform = publishTask.accountType === AccountType.WxGzh ? AccountType.WxGzh : AccountType.Toutiao
+    const platform = this.resolvePlatform(publishTask.accountType)
+    if (!platform) {
+      throw PublishingException.nonRetryable('Unsupported orchestration platform')
+    }
     const publishTargetId = publishTask.option?.orchestration?.publishTargetId || account.externalId || account.uid
     const orchestrationParams = withBestEffortArticleFeatures(publishTask.option?.orchestration?.params || {})
     const articleHtml = resolveArticleHtml(publishTask.option)
@@ -256,8 +259,22 @@ export class OrchestrationPublishService extends PublishService {
     if (accountType === AccountType.WxGzh) {
       return imgUrlList && imgUrlList.length > 0 ? 'image_text' : 'article'
     }
+    if (accountType === AccountType.WechatMoments) {
+      return 'image_text'
+    }
     if (accountType === AccountType.Toutiao) {
       return 'article'
+    }
+    return null
+  }
+
+  private resolvePlatform(accountType: AccountType): AccountType.WxGzh | AccountType.WechatMoments | AccountType.Toutiao | null {
+    if (
+      accountType === AccountType.WxGzh
+      || accountType === AccountType.WechatMoments
+      || accountType === AccountType.Toutiao
+    ) {
+      return accountType
     }
     return null
   }

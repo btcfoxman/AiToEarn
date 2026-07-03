@@ -91,7 +91,10 @@ function normalizePublishOption(item: PubItem) {
     let contentType = requestedContentType
 
     if (!contentType || !supportedContentTypes.includes(contentType)) {
-      if (
+      if (item.account.type === PlatType.WechatMoments && (supportedContentTypes.length === 0 || supportedContentTypes.includes('image_text'))) {
+        contentType = 'image_text'
+      }
+      else if (
         item.account.type === PlatType.WxGzh
         && item.params.images?.length
         && supportedContentTypes.includes('image_text')
@@ -233,8 +236,9 @@ export function usePublishActions({
           option: normalizedOption,
         },
       })
+      const shouldDropTopics = isArticleContent || item.account.type === PlatType.WechatMoments
       const res = await apiCreatePublish({
-        topics: isArticleContent ? [] : (item.params.topics ?? []),
+        topics: shouldDropTopics ? [] : (item.params.topics ?? []),
         flowId: generateUUID(),
         type: item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
         title: item.params.title || '',

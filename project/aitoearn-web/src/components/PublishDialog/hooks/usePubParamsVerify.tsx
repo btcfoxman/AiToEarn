@@ -105,6 +105,9 @@ const MEDIA_LIMITS = {
   wxGzh: {
     imageMaxSize: 10 * MB,
   },
+  wechatMoments: {
+    imageMaxSize: 10 * MB,
+  },
 } as const
 
 function hasOversizedImage(images: IImgFile[] | undefined, maxSize: number) {
@@ -244,12 +247,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
     for (const v of data) {
       const platInfo = AccountPlatInfoMap.get(v.account!.type)!
       const isArticleContent = isArticlePublishItem(v)
-      const { topics } = isArticleContent
-        ? { topics: [] }
-        : parseTopicString(v.params.des || '')
-      const topicsAll = isArticleContent
-        ? []
-        : [...new Set((v.params.topics ?? []).concat(topics))]
+      const shouldParseTopics = !isArticleContent && v.account.type !== PlatType.WechatMoments
+      const { topics } = shouldParseTopics
+        ? parseTopicString(v.params.des || '')
+        : { topics: [] }
+      const topicsAll = shouldParseTopics
+        ? [...new Set((v.params.topics ?? []).concat(topics))]
+        : []
       const { topicMax } = platInfo.commonPubParamsConfig
       const video = v.params.video
 
@@ -362,7 +366,7 @@ export default function usePubParamsVerify(data: PubItem[]) {
       }
 
       // 话题数量校验
-      if (!isArticleContent && topicsAll.length > topicMax) {
+      if (shouldParseTopics && topicsAll.length > topicMax) {
         addErrorMsg(
           t('validation.topicMaxExceeded', {
             platformName: platInfo.name,
@@ -372,7 +376,7 @@ export default function usePubParamsVerify(data: PubItem[]) {
       }
 
       // 判断描述中的话题中间是否用空格分割，如：#话题1#话题2#话题3 这种格式错误
-      if (!isArticleContent && descTopicRegex.test(v.params.des || '')) {
+      if (shouldParseTopics && descTopicRegex.test(v.params.des || '')) {
         addErrorMsg(t('validation.topicFormatError'))
       }
 
@@ -725,6 +729,12 @@ export default function usePubParamsVerify(data: PubItem[]) {
       // 微信公众号的强制校验
       if (v.account.type === PlatType.WxGzh) {
         if (hasOversizedImage(v.params.images, MEDIA_LIMITS.wxGzh.imageMaxSize)) {
+          addErrorMsg(t('validation.wxGzhImageSize'))
+        }
+      }
+
+      if (v.account.type === PlatType.WechatMoments) {
+        if (hasOversizedImage(v.params.images, MEDIA_LIMITS.wechatMoments.imageMaxSize)) {
           addErrorMsg(t('validation.wxGzhImageSize'))
         }
       }

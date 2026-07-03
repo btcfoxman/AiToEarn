@@ -82,7 +82,7 @@ export function ChannelSidebar() {
       setSelectedPlatform(platform)
     }
     else {
-      if (platform === PlatType.Toutiao) {
+      if (platform === PlatType.WechatMoments || platform === PlatType.Toutiao) {
         setCurrentView('connect-list')
         return
       }

@@ -42,6 +42,19 @@ function getTargetPublishFeatures(target: {
   ])]
 }
 
+function resolveAccountType(platform: string): AccountType {
+  if (platform === AccountType.WxGzh) {
+    return AccountType.WxGzh
+  }
+  if (platform === AccountType.WechatMoments) {
+    return AccountType.WechatMoments
+  }
+  if (platform === AccountType.Toutiao) {
+    return AccountType.Toutiao
+  }
+  throw new AppException(ResponseCode.AccountNotFound, `Unsupported orchestration publish platform: ${platform}`)
+}
+
 @Controller('plat/orchestration')
 export class OrchestrationPublishController {
   constructor(
@@ -69,7 +82,7 @@ export class OrchestrationPublishController {
     }
 
     const features = getTargetPublishFeatures(target)
-    const accountType = target.platform === AccountType.WxGzh ? AccountType.WxGzh : AccountType.Toutiao
+    const accountType = resolveAccountType(target.platform)
     const accountName = target.accountName || target.publishTargetId
     const account = await this.accountService.addAccount(token.id, {
       type: accountType,

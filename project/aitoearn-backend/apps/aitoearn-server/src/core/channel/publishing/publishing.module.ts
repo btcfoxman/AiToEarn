@@ -115,6 +115,7 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
         [AccountType.Douyin]: douyin,
         [AccountType.GOOGLE_BUSINESS]: googleBusiness,
         [AccountType.WxGzh]: wxGzhRouter,
+        [AccountType.WechatMoments]: orchestration,
         [AccountType.Toutiao]: orchestration,
       }),
       inject: [

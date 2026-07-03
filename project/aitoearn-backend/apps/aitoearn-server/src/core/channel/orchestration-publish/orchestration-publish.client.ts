@@ -4,7 +4,7 @@ import { config } from '../../../config'
 
 export interface OrchestrationPublishTarget {
   publishTargetId: string
-  platform: 'wxGzh' | 'toutiao'
+  platform: 'wxGzh' | 'wechat_moments' | 'toutiao'
   internalPlatform?: string
   accountAssetId?: string
   accountName?: string

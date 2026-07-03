@@ -81,6 +81,10 @@ export function getPublishItemOrchestrationContentType(pubItem: PubItem): Orches
     return undefined
   }
 
+  if (pubItem.account.type === PlatType.WechatMoments && (contentTypes.length === 0 || contentTypes.includes('image_text'))) {
+    return 'image_text'
+  }
+
   if (
     pubItem.account.type === PlatType.WxGzh
     && pubItem.params.images?.length

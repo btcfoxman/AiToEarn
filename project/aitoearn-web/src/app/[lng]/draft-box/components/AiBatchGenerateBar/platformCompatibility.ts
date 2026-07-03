@@ -116,6 +116,10 @@ const PLATFORM_CONSTRAINTS: Partial<Record<PlatType, PlatformConstraint>> = {
     videoCategories: [],
     imagesMax: 10,
   },
+  wechat_moments: {
+    videoCategories: [],
+    imagesMax: 9,
+  },
   toutiao: {
     videoCategories: [],
     imagesMax: 9,

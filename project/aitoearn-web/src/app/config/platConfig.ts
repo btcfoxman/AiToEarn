@@ -27,6 +27,7 @@ export enum PlatType {
   BILIBILI = 'bilibili', // B站
   Twitter = 'twitter', // Twitter
   WxGzh = 'wxGzh', // 微信公众号
+  WechatMoments = 'wechat_moments', // 微信朋友圈
   Toutiao = 'toutiao',
   Facebook = 'facebook', // Facebook
   Instagram = 'instagram', // Instagram
@@ -298,6 +299,22 @@ export const AccountPlatInfoMap = new Map<PlatType, IAccountPlatInfo>([
         topicMax: 0,
         desMax: 20000,
         imagesMax: 10,
+      },
+      themeColor: '#07C160',
+      jiancha: true,
+    },
+  ],
+  [
+    PlatType.WechatMoments,
+    {
+      name: '朋友圈',
+      icon: gzhSvg,
+      url: 'https://weixin.qq.com/',
+      pubTypes: new Set([PubType.ImageText]),
+      commonPubParamsConfig: {
+        topicMax: 100,
+        desMax: 2000,
+        imagesMax: 9,
       },
       themeColor: '#07C160',
       jiancha: true,

@@ -82,7 +82,7 @@ export function ConnectChannelList() {
   const { t } = useTransClient('account')
   const isMobile = useIsMobile()
   const [orchestrationPlatform, setOrchestrationPlatform] = useState<
-    PlatType.WxGzh | PlatType.Toutiao | null
+    PlatType.WxGzh | PlatType.WechatMoments | PlatType.Toutiao | null
   >(null)
   const [publishTargets, setPublishTargets] = useState<OrchestrationPublishTarget[]>([])
   const [targetsLoading, setTargetsLoading] = useState(false)
@@ -136,7 +136,9 @@ export function ConnectChannelList() {
     return resolvedSpaceId
   }
 
-  const loadOrchestrationTargets = async (platform: PlatType.WxGzh | PlatType.Toutiao) => {
+  const loadOrchestrationTargets = async (
+    platform: PlatType.WxGzh | PlatType.WechatMoments | PlatType.Toutiao,
+  ) => {
     setTargetsLoading(true)
     try {
       const res = await apiGetOrchestrationPublishTargets({ platform })
@@ -210,7 +212,11 @@ export function ConnectChannelList() {
 
     // 如果没有设置目标空间，使用默认空间
     const spaceId = ensureTargetSpaceId()
-    if (platform === PlatType.WxGzh || platform === PlatType.Toutiao) {
+    if (
+      platform === PlatType.WxGzh
+      || platform === PlatType.WechatMoments
+      || platform === PlatType.Toutiao
+    ) {
       setOrchestrationPlatform(platform)
       return
     }
