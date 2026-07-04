@@ -17,6 +17,7 @@ const {
 
 const {
   AI_URL,
+  AI_CLIENT_TIMEOUT_MS,
 } = process.env
 
 const {
@@ -308,6 +309,7 @@ module.exports = {
   aiClient: {
     baseUrl: AI_URL,
     token: INTERNAL_TOKEN,
+    timeout: Number(AI_CLIENT_TIMEOUT_MS || 3 * 60 * 1000),
   },
 
   // 中转服务（可选）
