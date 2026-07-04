@@ -77,7 +77,7 @@ function withBestEffortArticleFeatures(params: Record<string, unknown>) {
 }
 
 function resolveArticleHtml(option?: {
-  orchestration?: { articleHtml?: string }
+  orchestration?: { articleHtml?: string, articleBody?: string }
   article?: { html?: string, body?: string }
   [key: string]: unknown
 }) {
@@ -89,6 +89,16 @@ function resolveArticleHtml(option?: {
     return option.article.html
   }
   return option?.orchestration?.articleHtml
+}
+
+function resolveArticleBody(option?: {
+  orchestration?: { articleBody?: string }
+  article?: { body?: string }
+}) {
+  if (typeof option?.article?.body === 'string' && option.article.body) {
+    return option.article.body
+  }
+  return option?.orchestration?.articleBody
 }
 
 @Injectable()
@@ -119,7 +129,8 @@ export class OrchestrationPublishService extends PublishService {
       return { success: false, message: 'Unsupported orchestration content type' }
     }
     const articleHtml = resolveArticleHtml(publishTask.option)
-    if (!publishTask.desc && !articleHtml) {
+    const articleBody = resolveArticleBody(publishTask.option)
+    if (!publishTask.desc && !articleBody && !articleHtml) {
       return { success: false, message: 'Content body is required' }
     }
     if (publishTask.accountType !== AccountType.WechatMoments && contentType !== 'weitoutiao' && !publishTask.title) {
@@ -159,6 +170,8 @@ export class OrchestrationPublishService extends PublishService {
     }
 
     const imageUrls = (publishTask.imgUrlList || []).map(url => this.buildAssetUrl(url)).filter(Boolean)
+    const videoUrl = publishTask.videoUrl ? this.buildAssetUrl(publishTask.videoUrl) : undefined
+    const mediaUrls = [...imageUrls, ...(videoUrl ? [videoUrl] : [])]
     const coverUrl = publishTask.coverUrl ? this.buildAssetUrl(publishTask.coverUrl) : undefined
     const requestId = `aitoearn:${publishTask.id}`
     const platform = this.resolvePlatform(publishTask.accountType)
@@ -168,6 +181,7 @@ export class OrchestrationPublishService extends PublishService {
     const publishTargetId = publishTask.option?.orchestration?.publishTargetId || account.externalId || account.uid
     const orchestrationParams = withBestEffortArticleFeatures(publishTask.option?.orchestration?.params || {})
     const articleHtml = resolveArticleHtml(publishTask.option)
+    const articleBody = resolveArticleBody(publishTask.option) || publishTask.desc || ''
     const response = await this.orchestrationClient.createPublishTask({
       business_system: 'aitoearn',
       request_id: requestId,
@@ -180,10 +194,10 @@ export class OrchestrationPublishService extends PublishService {
       user_id: publishTask.userId,
       content: {
         title: publishTask.title || '',
-        body: publishTask.desc || '',
+        body: articleBody,
         html: articleHtml,
         image_urls: imageUrls,
-        media_urls: imageUrls,
+        media_urls: mediaUrls,
         cover_url: coverUrl,
         topics: publishTask.topics || [],
         extra: {

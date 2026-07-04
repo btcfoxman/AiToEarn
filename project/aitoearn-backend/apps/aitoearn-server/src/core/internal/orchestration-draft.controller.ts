@@ -22,17 +22,126 @@ function firstText(...values: any[]): string {
   return ''
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function htmlToText(value: string): string {
+  return firstText(value)
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|section|article|blockquote|h[1-6]|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function textToHtml(value: string): string {
+  return firstText(value)
+    .split(/\n{2,}/)
+    .map(part => firstText(part))
+    .filter(Boolean)
+    .map(part => `<p>${escapeHtml(part).replace(/\n/g, '<br />')}</p>`)
+    .join('')
+}
+
+function mediaTypeFromValue(value: any): MediaType {
+  const type = String(value?.type || value?.mediaType || value?.media_type || '').toLowerCase()
+  return type === 'video' ? MediaType.VIDEO : MediaType.IMG
+}
+
+function mediaUrlFromValue(value: any): string {
+  return firstText(
+    value?.url,
+    value?.src,
+    value?.mediaUrl,
+    value?.media_url,
+    value?.videoUrl,
+    value?.video_url,
+    value?.playUrl,
+    value?.play_url,
+    value?.imageUrl,
+    value?.image_url,
+  )
+}
+
+function blockToHtml(block: any): string {
+  const type = String(block?.type || '').toLowerCase()
+  const rawHtml = firstText(block?.html, block?.content_html)
+  if (rawHtml)
+    return rawHtml
+
+  if (type === 'image') {
+    const url = mediaUrlFromValue(block)
+    if (!url)
+      return ''
+    const alt = escapeHtml(firstText(block?.alt, block?.caption, block?.title))
+    return `<p><img src="${escapeHtml(url)}"${alt ? ` alt="${alt}"` : ''} /></p>`
+  }
+
+  if (type === 'video') {
+    const url = mediaUrlFromValue(block)
+    if (!url)
+      return ''
+    return `<p><video controls src="${escapeHtml(url)}"></video></p>`
+  }
+
+  const text = firstText(block?.text, block?.content, block?.body)
+  if (!text)
+    return ''
+  if (['heading', 'h1', 'h2', 'h3'].includes(type))
+    return `<h2>${escapeHtml(text)}</h2>`
+  return textToHtml(text)
+}
+
+function buildArticleHtml(draft: Record<string, any>, bodyText: string): string {
+  const html = firstText(draft['html'], draft['articleHtml'], draft['article_html'], draft['contentHtml'], draft['content_html'])
+  if (html)
+    return html
+
+  const blocks = Array.isArray(draft['blocks']) ? draft['blocks'] : []
+  const blockHtml = blocks.map(blockToHtml).filter(Boolean).join('')
+  if (blockHtml)
+    return blockHtml
+
+  return textToHtml(bodyText)
+}
+
+function extractMediaFromHtml(html: string) {
+  const result: Array<{ url: string, type: MediaType, thumbUrl?: string, content?: string }> = []
+  const imagePattern = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi
+  const videoPattern = /<(?:video|source)\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi
+  let match: RegExpExecArray | null
+  while ((match = imagePattern.exec(html)) !== null) {
+    result.push({ url: match[1], type: MediaType.IMG })
+  }
+  while ((match = videoPattern.exec(html)) !== null) {
+    result.push({ url: match[1], type: MediaType.VIDEO })
+  }
+  return result
+}
+
 function normalizeMedia(draft: Record<string, any>) {
   const media = Array.isArray(draft['media']) ? draft['media'] : []
   const fromMedia = media
     .map((item: any) => {
-      const url = firstText(item?.url, item?.src, item?.image_url)
+      const url = mediaUrlFromValue(item)
       if (!url)
         return null
       return {
         url,
-        type: String(item?.type || 'image').toLowerCase() === 'video' ? MediaType.VIDEO : MediaType.IMG,
-        thumbUrl: firstText(item?.thumbUrl, item?.thumb_url, item?.thumbnail),
+        type: mediaTypeFromValue(item),
+        thumbUrl: firstText(item?.thumbUrl, item?.thumb_url, item?.thumbnail, item?.coverUrl, item?.cover_url),
         content: firstText(item?.content, item?.caption),
       }
     })
@@ -40,16 +149,17 @@ function normalizeMedia(draft: Record<string, any>) {
 
   const blocks = Array.isArray(draft['blocks']) ? draft['blocks'] : []
   const fromBlocks = blocks
-    .filter((item: any) => String(item?.type || '').toLowerCase() === 'image' && firstText(item?.url, item?.src))
+    .filter((item: any) => ['image', 'video'].includes(String(item?.type || '').toLowerCase()) && mediaUrlFromValue(item))
     .map((item: any) => ({
-      url: firstText(item?.url, item?.src),
-      type: MediaType.IMG,
+      url: mediaUrlFromValue(item),
+      type: mediaTypeFromValue(item),
       thumbUrl: firstText(item?.thumbUrl, item?.thumb_url),
       content: firstText(item?.caption, item?.alt),
     }))
+  const fromHtml = extractMediaFromHtml(firstText(draft['html'], draft['articleHtml'], draft['article_html'], draft['contentHtml'], draft['content_html']))
 
   const seen = new Set<string>()
-  return [...fromMedia, ...fromBlocks].filter((item: any) => {
+  return [...fromMedia, ...fromBlocks, ...fromHtml].filter((item: any) => {
     if (!item?.url || seen.has(item.url))
       return false
     seen.add(item.url)
@@ -117,12 +227,15 @@ export class OrchestrationDraftInternalController {
     if (!groupId)
       throw new BadRequestException('material group not found')
 
-    const html = firstText(draft['html'], draft['articleHtml'])
-    const bodyText = firstText(draft['body'], draft['clean_text'], draft['description'])
+    const existingHtml = firstText(draft['html'], draft['articleHtml'], draft['article_html'], draft['contentHtml'], draft['content_html'])
+    const bodyText = firstText(draft['body'], draft['clean_text'], htmlToText(existingHtml), draft['description'])
+    const html = buildArticleHtml(draft, bodyText)
+    const description = firstText(draft['description'], draft['summary'])
     const format = firstText(draft['format'], 'article')
     const platform = firstText(draft['platform'], 'wechat_mp')
     const components = Array.isArray(draft['components']) ? draft['components'] : []
     const blocks = Array.isArray(draft['blocks']) ? draft['blocks'] : []
+    const mediaList = normalizeMedia({ ...draft, html })
     const topics = Array.isArray(draft['hashtags'])
       ? draft['hashtags']
       : (Array.isArray(draft['topics']) ? draft['topics'] : [])
@@ -134,9 +247,9 @@ export class OrchestrationDraftInternalController {
       taskId: draftId,
       groupId,
       coverUrl: firstText(draft['cover_url'], draft['coverUrl']),
-      mediaList: normalizeMedia(draft),
+      mediaList,
       title: firstText(draft['title'], 'AI 内容草稿'),
-      desc: firstText(draft['description'], bodyText).slice(0, 500),
+      desc: firstText(bodyText, description),
       type: MaterialType.ARTICLE,
       topics: topics.map((item: any) => String(item || '').replace(/^#/, '').trim()).filter(Boolean),
       status: MaterialStatus.SUCCESS,
@@ -146,8 +259,11 @@ export class OrchestrationDraftInternalController {
         article: {
           html,
           body: bodyText,
+          description,
+          summary: description,
           blocks,
           components,
+          media: mediaList,
           format,
           platform,
         },
@@ -159,6 +275,8 @@ export class OrchestrationDraftInternalController {
           status: firstText(draft['status']),
           version: Number(draft['version'] || 1),
           articleHtml: html,
+          articleBody: bodyText,
+          description,
           raw: compactOrchestrationDraft(draft),
         },
       },

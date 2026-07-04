@@ -102,6 +102,7 @@ export interface IPlatOption {
     contentType?: OrchestrationPublishContentType
     publishTargetId?: string
     articleHtml?: string
+    articleBody?: string
     params?: Record<string, unknown> & {
       articleBlocks?: OrchestrationArticleBlock[]
       article_blocks?: OrchestrationArticleBlock[]

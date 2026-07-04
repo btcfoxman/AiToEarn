@@ -80,7 +80,7 @@ const PublishDialogPreview = memo(
 
     const isArticlePreview = expandedPubItem ? isArticlePublishItem(expandedPubItem) : false
     const articleHtml = expandedPubItem?.params.option.orchestration?.articleHtml
-    const articleBody = (articleHtml || expandedPubItem?.params.des || '').trim()
+    const articleBody = (articleHtml || expandedPubItem?.params.option.orchestration?.articleBody || expandedPubItem?.params.des || '').trim()
     const articleTitle = expandedPubItem?.params.title || expandedPubItem?.params.option.wxGzh?.title || ''
     const hasPreviewContent = Boolean(
       expandedPubItem && (

@@ -71,6 +71,36 @@ function resolveArticleHtml(option?: Record<string, unknown>): string | undefine
   return undefined
 }
 
+function htmlToText(value?: string): string {
+  return (value || '')
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|section|article|blockquote|h[1-6]|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function resolveArticleBody(material: PromotionMaterial): string {
+  const option = material.option
+  const article = asRecord(option?.article)
+  const articleBody = article?.body
+  if (typeof articleBody === 'string' && articleBody.trim())
+    return articleBody.trim()
+
+  const orchestration = asRecord(option?.orchestration)
+  const orchestrationBody = orchestration?.articleBody
+  if (typeof orchestrationBody === 'string' && orchestrationBody.trim())
+    return orchestrationBody.trim()
+
+  return htmlToText(resolveArticleHtml(option)) || material.desc || ''
+}
+
 function isArticleMaterial(material?: PromotionMaterial | null): boolean {
   if (!material)
     return false
@@ -195,14 +225,30 @@ function DraftContentModule({
 
       if (isArticleDraft) {
         const articleHtml = resolveArticleHtml(publishingDraft.option)
+        const articleBody = resolveArticleBody(publishingDraft)
+        params.des = articleBody
         params.option = {
           orchestration: {
             contentType: 'article',
             ...(articleHtml ? { articleHtml } : {}),
+            ...(articleBody ? { articleBody } : {}),
           },
         }
       }
 
+      const draftImages = publishingDraft.mediaList
+        ?.filter(m => m.type === 'img')
+        .map((m, i) => ({
+          id: `draft-img-${i}`,
+          size: 0,
+          file: new File([], ''),
+          imgUrl: m.url,
+          filename: '',
+          imgPath: '',
+          width: 0,
+          height: 0,
+          ossUrl: m.url,
+        })) || []
       const videoMedia = publishingDraft.mediaList?.find(m => m.type === 'video')
       if (videoMedia) {
         try {
@@ -255,22 +301,10 @@ function DraftContentModule({
             },
           }
         }
-        params.images = []
+        params.images = isArticleDraft ? draftImages : []
       }
       else {
-        params.images = publishingDraft.mediaList
-          ?.filter(m => m.type === 'img')
-          .map((m, i) => ({
-            id: `draft-img-${i}`,
-            size: 0,
-            file: new File([], ''),
-            imgUrl: m.url,
-            filename: '',
-            imgPath: '',
-            width: 0,
-            height: 0,
-            ossUrl: m.url,
-          })) || []
+        params.images = draftImages
       }
 
       store.setAccountAllParams(params)

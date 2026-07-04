@@ -31,6 +31,7 @@ const OrchestrationPublishOptionSchema = z.object({
   contentType: z.enum(['image_text', 'article', 'weitoutiao']).optional(),
   publishTargetId: z.string().optional(),
   articleHtml: z.string().optional(),
+  articleBody: z.string().optional(),
   params: z.record(z.string(), z.any()).optional(),
 })
 
