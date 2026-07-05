@@ -240,7 +240,7 @@ export function usePublishActions({
       const res = await apiCreatePublish({
         topics: shouldDropTopics ? [] : (item.params.topics ?? []),
         flowId: generateUUID(),
-        type: isArticleContent ? PubType.Article : item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
+        type: isArticleContent ? PubType.ImageText : item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
         title: item.params.title || '',
         desc: item.params.des,
         accountId: item.account.id,

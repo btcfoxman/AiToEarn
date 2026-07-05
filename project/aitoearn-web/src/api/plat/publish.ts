@@ -6,6 +6,7 @@ import type {
 } from '@/api/plat/types/publish.types'
 import type { PlatType } from '@/app/config/platConfig'
 import type { IPlatOption } from '@/components/PublishDialog/publishDialog.type'
+import { PubType } from '@/app/config/publishConfig'
 import { isArticlePublishOption } from '@/components/PublishDialog/PublishDialog.util'
 import { parseTopicString } from '@/utils'
 import { request } from '@/utils/request'
@@ -52,6 +53,10 @@ export function apiCreatePublish(data: PublishParams) {
   }
 
   // 根据accountType过滤option参数
+  if (data.type === PubType.Article || data.type === PubType.Weitoutiao) {
+    data.type = PubType.ImageText
+  }
+
   data.option = filterOptionByPlatform(data.option, data.accountType)
 
   return request<{ id: string }>({
