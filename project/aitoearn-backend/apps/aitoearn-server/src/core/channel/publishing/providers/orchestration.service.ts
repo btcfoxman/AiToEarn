@@ -178,7 +178,7 @@ export class OrchestrationPublishService extends PublishService {
     if (!platform) {
       throw PublishingException.nonRetryable('Unsupported orchestration platform')
     }
-    const publishTargetId = publishTask.option?.orchestration?.publishTargetId || account.externalId || account.uid
+    const publishTargetId = account.externalId || publishTask.option?.orchestration?.publishTargetId || account.uid
     const orchestrationParams = withBestEffortArticleFeatures(publishTask.option?.orchestration?.params || {})
     const articleHtml = resolveArticleHtml(publishTask.option)
     const articleBody = resolveArticleBody(publishTask.option) || publishTask.desc || ''
