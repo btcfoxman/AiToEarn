@@ -568,7 +568,11 @@ export class PublishingService {
     if (!taskInfo) {
       throw new AppException(ResponseCode.PublishTaskNotFound)
     }
-    if (taskInfo.status !== PublishStatus.WaitingForPublish) {
+    const canPublishImmediately = [
+      PublishStatus.WaitingForPublish,
+      PublishStatus.FAILED,
+    ].includes(taskInfo.status)
+    if (!canPublishImmediately) {
       throw new AppException(ResponseCode.PublishTaskStatusInvalid)
     }
 
@@ -579,8 +583,21 @@ export class PublishingService {
       }
     }
 
-    await this.publishRecordService.updateById(id, { publishTime: new Date(), queued: true })
-    await this.enqueuePublishingTask(taskInfo)
+    const retryTask = await this.publishRecordService.updateById(id, {
+      $set: {
+        publishTime: new Date(),
+        status: PublishStatus.WaitingForPublish,
+        queued: true,
+        inQueue: false,
+        errorMsg: '',
+      },
+      $unset: {
+        dataId: '',
+        workLink: '',
+        'dataOption.orchestration': '',
+      },
+    })
+    await this.enqueuePublishingTask(retryTask || taskInfo)
   }
 
   /**
