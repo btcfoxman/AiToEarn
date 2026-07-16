@@ -281,29 +281,49 @@ jobs:
     env:
       AITOEARN_E2E_BASE_URL: ${{ vars.AITOEARN_E2E_BASE_URL || 'http://192.168.3.6:8081/zh-CN' }}
       AITOEARN_E2E_ATTEMPTS: ${{ vars.AITOEARN_E2E_ATTEMPTS || '10' }}
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.57.0-noble
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Fetch E2E files
+        env:
+          CHECKOUT_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work_dir="${RUNNER_TEMP:-/tmp}/aitoearn-e2e-${GITHUB_RUN_ID}"
+          rm -rf "${work_dir}"
+          mkdir -p "${work_dir}/tests/e2e"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          auth_config="${work_dir}/.curl-auth"
+          cleanup_auth() {
+            rm -f "${auth_config}"
+          }
+          trap cleanup_auth EXIT
+          {
+            printf 'header = "Authorization: Bearer %s"\n' "${CHECKOUT_TOKEN}"
+            printf 'header = "Accept: application/vnd.github.raw"\n'
+            printf 'header = "X-GitHub-Api-Version: 2022-11-28"\n'
+          } > "${auth_config}"
+          chmod 600 "${auth_config}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ${{ env.WEB_DIR }}/pnpm-lock.yaml
+          download_file() {
+            local path="$1"
+            local destination="$2"
+            curl --config "${auth_config}" \
+              --fail --location --silent --show-error \
+              --retry 5 --retry-delay 5 --connect-timeout 20 --max-time 120 \
+              -o "${destination}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${GITHUB_SHA}"
+          }
 
-      - name: Install dependencies
-        working-directory: ${{ env.WEB_DIR }}
-        run: pnpm install --frozen-lockfile
+          download_file "${WEB_DIR}/package.json" "${work_dir}/package.json"
+          download_file "${WEB_DIR}/pnpm-lock.yaml" "${work_dir}/pnpm-lock.yaml"
+          download_file "${WEB_DIR}/pnpm-workspace.yaml" "${work_dir}/pnpm-workspace.yaml"
+          download_file \
+            "${WEB_DIR}/tests/e2e/cold-start-stability.spec.ts" \
+            "${work_dir}/tests/e2e/cold-start-stability.spec.ts"
 
-      - name: Install Playwright Chromium
-        working-directory: ${{ env.WEB_DIR }}
-        run: pnpm exec playwright install chromium
+          rm -f "${auth_config}"
+          trap - EXIT
+          echo "E2E_WORK_DIR=${work_dir}" >> "${GITHUB_ENV}"
 
       - name: Wait for deployed web page
         run: |
@@ -327,19 +347,48 @@ jobs:
           exit 1
 
       - name: Run deployed cold-start regression
-        working-directory: ${{ env.WEB_DIR }}
-        run: >-
-          pnpm exec playwright test
-          tests/e2e/cold-start-stability.spec.ts
-          --workers=1
-          --trace=retain-on-failure
-          --reporter=line
+        run: |
+          set -euo pipefail
+          results_dir="${RUNNER_TEMP:-/tmp}/aitoearn-e2e-results-${GITHUB_RUN_ID}"
+          rm -rf "${results_dir}"
+          mkdir -p "${results_dir}"
 
-      - name: Upload Playwright failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: aitoearn-test-cold-start-${{ github.run_id }}
-          path: ${{ env.WEB_DIR }}/test-results
-          if-no-files-found: ignore
-          retention-days: 7
+          pull_image() {
+            docker pull "${PLAYWRIGHT_IMAGE}"
+          }
+          for attempt in $(seq 1 5); do
+            if pull_image; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "::error::Failed to pull ${PLAYWRIGHT_IMAGE}"
+              exit 1
+            fi
+            sleep 10
+          done
+
+          docker run --rm --init --ipc=host --network host \
+            --env AITOEARN_E2E_BASE_URL \
+            --env AITOEARN_E2E_ATTEMPTS \
+            --volume "${E2E_WORK_DIR}:/work:ro" \
+            --volume "${results_dir}:/results" \
+            "${PLAYWRIGHT_IMAGE}" \
+            bash -lc '
+              set -euo pipefail
+              cp -R /work /tmp/aitoearn-e2e
+              cd /tmp/aitoearn-e2e
+              corepack enable
+              corepack prepare pnpm@10 --activate
+              pnpm install --frozen-lockfile --ignore-scripts
+              set +e
+              pnpm exec playwright test \
+                tests/e2e/cold-start-stability.spec.ts \
+                --output=/results \
+                --workers=1 \
+                --trace=retain-on-failure \
+                --reporter=line
+              status=$?
+              set -e
+              chmod -R a+rX /results || true
+              exit "${status}"
+            '
