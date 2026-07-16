@@ -215,15 +215,22 @@ jobs:
           set -euo pipefail
 
           source_root="$(cd "$(dirname "${RUNNER_TEMP}")/.." && pwd)"
-          target_root="/home/btcfoxman/actions-runner-geoflow"
+          runner_version="$("${source_root}/bin/Runner.Listener" --version)"
+          target_root="/home/btcfoxman/actions-runner-geoflow-v2"
 
           if [ ! -f "${target_root}/.runner" ]; then
             mkdir -p "${target_root}"
-            for path in bin externals config.sh env.sh run.sh run-helper.sh.template runsvc.sh safe_sleep.sh svc.sh; do
-              if [ -e "${source_root}/${path}" ]; then
-                cp -a "${source_root}/${path}" "${target_root}/${path}"
-              fi
-            done
+            runner_archive="${RUNNER_TEMP}/actions-runner-linux-x64-${runner_version}.tar.gz"
+            curl \
+              --fail \
+              --location \
+              --retry 5 \
+              --retry-delay 5 \
+              --connect-timeout 20 \
+              --max-time 300 \
+              --output "${runner_archive}" \
+              "https://github.com/actions/runner/releases/download/v${runner_version}/actions-runner-linux-x64-${runner_version}.tar.gz"
+            tar -xzf "${runner_archive}" -C "${target_root}"
 
             cd "${target_root}"
             ./config.sh \
