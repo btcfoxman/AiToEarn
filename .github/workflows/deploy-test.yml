@@ -268,3 +268,78 @@ jobs:
           set -euo pipefail
           cd "${REPO_WORK_DIR}"
           bash test/deploy.sh
+
+  verify-web-e2e:
+    name: Verify deployed web cold starts
+    needs: deploy
+    environment: test
+    runs-on:
+      - self-hosted
+      - linux
+      - aitoearn-test
+    timeout-minutes: 40
+    env:
+      AITOEARN_E2E_BASE_URL: ${{ vars.AITOEARN_E2E_BASE_URL || 'http://192.168.3.6:8081/zh-CN' }}
+      AITOEARN_E2E_ATTEMPTS: ${{ vars.AITOEARN_E2E_ATTEMPTS || '10' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ${{ env.WEB_DIR }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ${{ env.WEB_DIR }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        working-directory: ${{ env.WEB_DIR }}
+        run: pnpm exec playwright install chromium
+
+      - name: Wait for deployed web page
+        run: |
+          set -euo pipefail
+          if [ -z "${AITOEARN_E2E_BASE_URL:-}" ]; then
+            echo "::error::AITOEARN_E2E_BASE_URL is required"
+            exit 1
+          fi
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --location --silent --show-error \
+              --connect-timeout 10 --max-time 30 \
+              "${AITOEARN_E2E_BASE_URL}" >/dev/null; then
+              exit 0
+            fi
+            echo "Waiting for deployed web page (${attempt}/30)"
+            sleep 5
+          done
+
+          echo "::error::Deployed web page did not become ready"
+          exit 1
+
+      - name: Run deployed cold-start regression
+        working-directory: ${{ env.WEB_DIR }}
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/cold-start-stability.spec.ts
+          --workers=1
+          --trace=retain-on-failure
+          --reporter=line
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aitoearn-test-cold-start-${{ github.run_id }}
+          path: ${{ env.WEB_DIR }}/test-results
+          if-no-files-found: ignore
+          retention-days: 7
