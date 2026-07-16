@@ -110,6 +110,9 @@ export interface IPlatOption {
       feature_policy?: OrchestrationFeaturePolicy
       requestedFeatures?: OrchestrationPublishFeature[]
       requested_features?: OrchestrationPublishFeature[]
+      moments_visibility?: 'public' | 'partial' | 'private' | 'exclude' | string
+      moments_visible_label?: string
+      moments_visible_labels?: string[]
     }
   }
   bilibili?: {
