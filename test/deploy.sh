@@ -35,6 +35,44 @@ read_env_value() {
   awk -F= -v key="${key}" '$1 == key { print substr($0, length(key) + 2) }' "${file}" | tail -n1 | tr -d '"\r'
 }
 
+upsert_secret_env_value() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+  local tmp_file
+
+  if [ -z "${value}" ]; then
+    log "ERROR: required deployment secret ${key} is missing"
+    return 1
+  fi
+  case "${value}" in
+    *$'\n'*|*$'\r'*|*"'"*)
+      log "ERROR: ${key} contains characters unsupported by the compose env file"
+      return 1
+      ;;
+  esac
+
+  tmp_file="$(mktemp "${file}.tmp.XXXXXX")"
+  ENV_SECRET_VALUE="'${value}'" awk -v key="${key}" '
+    BEGIN { replaced = 0 }
+    $0 ~ ("^" key "=") {
+      if (!replaced) {
+        print key "=" ENVIRON["ENV_SECRET_VALUE"]
+        replaced = 1
+      }
+      next
+    }
+    { print }
+    END {
+      if (!replaced)
+        print key "=" ENVIRON["ENV_SECRET_VALUE"]
+    }
+  ' "${file}" > "${tmp_file}"
+  chmod 600 "${tmp_file}"
+  mv -f "${tmp_file}" "${file}"
+  unset ENV_SECRET_VALUE
+}
+
 ensure_rustfs_bucket() {
   local env_file="$1"
   local bucket="$2"
@@ -105,6 +143,8 @@ if [ ! -f "${APP_DIR}/.env" ]; then
 fi
 
 chmod 600 "${APP_DIR}/.env"
+upsert_secret_env_value INTERNAL_TOKEN "${AITOEARN_INTERNAL_API_KEY:-}" "${APP_DIR}/.env"
+unset AITOEARN_INTERNAL_API_KEY
 
 rustfs_bucket="$(read_env_value RUSTFS_BUCKET "${APP_DIR}/.env")"
 rustfs_bucket="${rustfs_bucket:-aitoearn-test}"
@@ -126,7 +166,11 @@ fi
 log "Validating compose config"
 cd "${APP_DIR}"
 export IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/btcfoxman/aitoearn}"
-export IMAGE_TAG="${IMAGE_TAG:-test-latest}"
+if [ -z "${IMAGE_TAG:-}" ] || [ "${IMAGE_TAG}" = "test-latest" ]; then
+  log "ERROR: IMAGE_TAG must be an immutable commit tag, not test-latest"
+  exit 1
+fi
+export IMAGE_TAG
 docker compose -f "${COMPOSE_FILE}" config >/dev/null
 
 log "Pulling images"

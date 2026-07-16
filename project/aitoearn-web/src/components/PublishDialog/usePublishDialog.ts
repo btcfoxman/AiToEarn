@@ -10,7 +10,8 @@ import {
   PlatType,
 } from '@/app/config/platConfig'
 import { PubType } from '@/app/config/publishConfig'
-import { debugPublishDialog, getSocialAccountIdentityKeys, isSameSocialAccount } from '@/components/PublishDialog/PublishDialog.util'
+import { debugPublishDialog } from '@/components/PublishDialog/PublishDialog.util'
+import { areValidationMapsEqual, reconcilePublishAccounts } from '@/components/PublishDialog/publishDialogStateSync'
 import { usePublishDialogStorageStore } from '@/components/PublishDialog/usePublishDialogStorageStore'
 
 export interface IPublishDialogStore {
@@ -74,19 +75,6 @@ function getDefaultContentCategory(params: Pick<IPubParams, 'video'>) {
   return params.video ? 'reel' : 'post'
 }
 
-function dedupePublishAccounts(accounts: SocialAccount[]) {
-  return accounts.reduce<SocialAccount[]>((result, accountItem) => {
-    const existingIndex = result.findIndex(item => isSameSocialAccount(item, accountItem))
-    if (existingIndex === -1) {
-      result.push(accountItem)
-      return result
-    }
-
-    result[existingIndex] = accountItem
-    return result
-  }, [])
-}
-
 function normalizePlatformOptions(accountType: SocialAccount['type'], params: IPubParams): IPubParams {
   const option = { ...params.option }
 
@@ -148,24 +136,6 @@ function removeUndefinedOptionFields(target: IPlatOption, patch: IPlatOption) {
   }
 }
 
-function setPubItemIdentityMap(target: Map<string, PubItem>, pubItem: PubItem) {
-  getSocialAccountIdentityKeys(pubItem.account).forEach((key) => {
-    if (!target.has(key)) {
-      target.set(key, pubItem)
-    }
-  })
-}
-
-function getPubItemByAccount(target: Map<string, PubItem>, account: SocialAccount) {
-  for (const key of getSocialAccountIdentityKeys(account)) {
-    const pubItem = target.get(key)
-    if (pubItem)
-      return pubItem
-  }
-
-  return undefined
-}
-
 export const usePublishDialog = create(
   combine(
     {
@@ -195,11 +165,15 @@ export const usePublishDialog = create(
           })
         },
         setErrParamsMap(errParamsMap: ErrPubParamsMapType) {
+          if (areValidationMapsEqual(get().errParamsMap, errParamsMap))
+            return
           set({
             errParamsMap,
           })
         },
         setWarningParamsMap(warningParamsMap: ErrPubParamsMapType) {
+          if (areValidationMapsEqual(get().warningParamsMap, warningParamsMap))
+            return
           set({
             warningParamsMap,
           })
@@ -270,10 +244,23 @@ export const usePublishDialog = create(
 
         // 同步外部账号刷新结果，保留已编辑的发布参数
         syncAccounts(account: SocialAccount[]) {
-          const filteredAccounts = dedupePublishAccounts(account)
           const currentPubList = get().pubList
+          const currentPubListChoosed = get().pubListChoosed
+          const currentExpandedPubItem = get().expandedPubItem
+          const reconciled = reconcilePublishAccounts(
+            account,
+            {
+              pubList: currentPubList,
+              pubListChoosed: currentPubListChoosed,
+              expandedPubItem: currentExpandedPubItem,
+            },
+            accountItem => ({
+              account: accountItem,
+              params: methods.pubParamsInit(),
+            }),
+          )
           debugPublishDialog('syncAccounts:start', {
-            incomingAccounts: filteredAccounts.map(accountItem => ({
+            incomingAccounts: reconciled.accounts.map(accountItem => ({
               account: accountItem.account,
               id: accountItem.id,
               status: accountItem.status,
@@ -292,52 +279,11 @@ export const usePublishDialog = create(
                 || pubItem.params.images?.length
               ),
             })),
-            selectedIds: get().pubListChoosed.map(pubItem => pubItem.account.id),
+            selectedIds: currentPubListChoosed.map(pubItem => pubItem.account.id),
           })
-          if (filteredAccounts.length === 0 && currentPubList.length > 0) {
-            return
-          }
-
-          const currentPubListChoosed = get().pubListChoosed
-          const currentExpandedPubItem = get().expandedPubItem
-          const currentPubItemMap = new Map<string, PubItem>()
-          currentPubList.forEach((pubItem) => {
-            setPubItemIdentityMap(currentPubItemMap, pubItem)
-          })
-          currentPubListChoosed.forEach((pubItem) => {
-            setPubItemIdentityMap(currentPubItemMap, pubItem)
-          })
-          if (currentExpandedPubItem && !currentPubItemMap.has(currentExpandedPubItem.account.id)) {
-            setPubItemIdentityMap(currentPubItemMap, currentExpandedPubItem)
-          }
-
-          const nextPubList = filteredAccounts.map((accountItem) => {
-            const currentPubItem = getPubItemByAccount(currentPubItemMap, accountItem)
-            if (!currentPubItem) {
-              return {
-                account: accountItem,
-                params: methods.pubParamsInit(),
-              }
-            }
-
-            return {
-              ...currentPubItem,
-              account: accountItem,
-            }
-          })
-          const nextPubItemMap = new Map<string, PubItem>()
-          nextPubList.forEach((pubItem) => {
-            setPubItemIdentityMap(nextPubItemMap, pubItem)
-          })
-          const nextPubListChoosed = currentPubListChoosed
-            .map(pubItem => getPubItemByAccount(nextPubItemMap, pubItem.account))
-            .filter((pubItem): pubItem is PubItem => Boolean(pubItem))
-          const nextExpandedPubItem = currentExpandedPubItem
-            ? getPubItemByAccount(nextPubItemMap, currentExpandedPubItem.account)
-            : undefined
 
           debugPublishDialog('syncAccounts:next', {
-            nextPubList: nextPubList.map(pubItem => ({
+            nextPubList: reconciled.pubList.map(pubItem => ({
               account: pubItem.account.account,
               id: pubItem.account.id,
               status: pubItem.account.status,
@@ -349,14 +295,17 @@ export const usePublishDialog = create(
                 || pubItem.params.images?.length
               ),
             })),
-            nextSelectedIds: nextPubListChoosed.map(pubItem => pubItem.account.id),
-            nextExpandedId: nextExpandedPubItem?.account.id,
+            nextSelectedIds: reconciled.pubListChoosed.map(pubItem => pubItem.account.id),
+            nextExpandedId: reconciled.expandedPubItem?.account.id,
           })
 
+          if (!reconciled.changed)
+            return
+
           set({
-            pubList: nextPubList,
-            pubListChoosed: nextPubListChoosed,
-            expandedPubItem: nextExpandedPubItem,
+            pubList: reconciled.pubList,
+            pubListChoosed: reconciled.pubListChoosed,
+            expandedPubItem: reconciled.expandedPubItem,
           })
         },
 

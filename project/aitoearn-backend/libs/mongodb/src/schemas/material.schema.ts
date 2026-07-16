@@ -101,6 +101,18 @@ export class Material extends WithTimestampSchema {
   })
   taskId?: string // 使用生成的任务ID
 
+  /** Stable upstream identity for an ai-orchestration import. */
+  @Prop({ required: false })
+  orchestrationSourceKey?: string
+
+  /** SHA-256 of the canonical import request after public-field normalization. */
+  @Prop({ required: false })
+  orchestrationRequestSha256?: string
+
+  /** SHA-256 of the canonical public final content. */
+  @Prop({ required: false })
+  orchestrationContentSha256?: string
+
   /** 素材来源 */
   @Prop({
     required: true,
@@ -219,3 +231,13 @@ export class Material extends WithTimestampSchema {
 export const MaterialSchema = SchemaFactory.createForClass(Material)
 
 MaterialSchema.index({ 'userId': 1, 'brandInfo.placeId': 1 })
+MaterialSchema.index(
+  { userId: 1, orchestrationSourceKey: 1 },
+  {
+    unique: true,
+    name: 'uniq_material_orchestration_source',
+    partialFilterExpression: {
+      orchestrationSourceKey: { $type: 'string' },
+    },
+  },
+)

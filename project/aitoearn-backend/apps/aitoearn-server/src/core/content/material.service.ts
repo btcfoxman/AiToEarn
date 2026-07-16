@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { AssetsService, VideoMetadataService } from '@yikart/assets'
 import { AccountType, FileUtil, TableDto, UserType } from '@yikart/common'
-import { AssetType, Material, MaterialRepository, MaterialStatus, MaterialType, MediaType } from '@yikart/mongodb'
+import { AssetType, Material, MaterialRepository, MaterialStatus, MaterialType, MediaType, OrchestrationImportIdentity } from '@yikart/mongodb'
 import { NewMaterial, UpMaterial } from './common'
 import { MediaService } from './media.service'
 
@@ -20,6 +20,11 @@ export class MaterialService {
     const dataWithCover = await this.ensureVideoCover(newData)
     const res = await this.materialRepository.create(dataWithCover)
     return res
+  }
+
+  async upsertOrchestrationImport(newData: NewMaterial, identity: OrchestrationImportIdentity) {
+    const dataWithCover = await this.ensureVideoCover(newData)
+    return this.materialRepository.upsertOrchestrationImport(dataWithCover, identity)
   }
 
   /**

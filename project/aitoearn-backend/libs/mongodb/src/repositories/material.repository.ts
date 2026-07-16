@@ -12,6 +12,18 @@ import { FilterQuery, Model, RootFilterQuery } from 'mongoose'
 import { Material, MaterialSource, MaterialStatus, MaterialType } from '../schemas'
 import { BaseRepository } from './base.repository'
 
+export interface OrchestrationImportIdentity {
+  sourceKey: string
+  requestSha256: string
+  contentSha256: string
+}
+
+export interface OrchestrationImportResult {
+  material: Material
+  created: boolean
+  conflict: boolean
+}
+
 @Injectable()
 export class MaterialRepository extends BaseRepository<Material> {
   constructor(
@@ -23,6 +35,68 @@ export class MaterialRepository extends BaseRepository<Material> {
 
   override async create(newData: Partial<Material>) {
     return await this.materialModel.create(newData)
+  }
+
+  /**
+   * Atomically inserts an ai-orchestration material or returns the prior result.
+   * Hashes are part of the predicate, so a reused source key with a changed
+   * request collides with the unique identity index instead of mutating data.
+   */
+  async upsertOrchestrationImport(
+    newData: Partial<Material> & { userId: string },
+    identity: OrchestrationImportIdentity,
+  ): Promise<OrchestrationImportResult> {
+    const importFields = {
+      orchestrationSourceKey: identity.sourceKey,
+      orchestrationRequestSha256: identity.requestSha256,
+      orchestrationContentSha256: identity.contentSha256,
+    }
+    try {
+      const result = await this.materialModel.findOneAndUpdate(
+        {
+          userId: newData.userId,
+          ...importFields,
+        },
+        {
+          $setOnInsert: {
+            ...newData,
+            ...importFields,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+          includeResultMetadata: true,
+        },
+      ) as any
+      const material = result?.value as Material | null
+      if (!material)
+        throw new Error('orchestration material upsert returned no document')
+      return {
+        material,
+        created: result?.lastErrorObject?.updatedExisting !== true,
+        conflict: false,
+      }
+    }
+    catch (error) {
+      if ((error as any)?.code !== 11000)
+        throw error
+
+      const existing = await this.materialModel.findOne({
+        userId: newData.userId,
+        orchestrationSourceKey: identity.sourceKey,
+      }).lean({ virtuals: true })
+      if (!existing)
+        throw error
+      const conflict = existing.orchestrationRequestSha256 !== identity.requestSha256
+        || existing.orchestrationContentSha256 !== identity.contentSha256
+      return {
+        material: existing,
+        created: false,
+        conflict,
+      }
+    }
   }
 
   // 批量删除

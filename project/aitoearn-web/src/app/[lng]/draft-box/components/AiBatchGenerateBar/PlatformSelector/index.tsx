@@ -147,31 +147,20 @@ const PlatformSelector = memo(
     return (
       <div className={cn(pillClass, 'gap-0 p-0')}>
         <Popover open={open} onOpenChange={setOpen}>
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex items-center gap-1.5 pl-3 py-1.5 cursor-pointer',
-                      effectiveLimitsDetailed ? 'pr-1.5' : 'pr-3',
-                    )}
-                  >
-                    {pillContent}
-                  </button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              {disabledSelectedCount > 0 && (
-                <TooltipContent side="top" className="max-w-60 text-xs">
-                  <div>
-                    {t('detail.platformIncompatibleCount', { count: disabledSelectedCount })}
-                  </div>
-                  <div className="text-muted-foreground">{disabledSelectedNames.join(', ')}</div>
-                </TooltipContent>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                'flex items-center gap-1.5 pl-3 py-1.5 cursor-pointer',
+                effectiveLimitsDetailed ? 'pr-1.5' : 'pr-3',
               )}
-            </Tooltip>
-          </TooltipProvider>
+              title={disabledSelectedCount > 0
+                ? `${t('detail.platformIncompatibleCount', { count: disabledSelectedCount })}: ${disabledSelectedNames.join(', ')}`
+                : undefined}
+            >
+              {pillContent}
+            </button>
+          </PopoverTrigger>
           <PopoverContent className="w-64 p-3" side="top" align="start">
             {/* 不兼容警告 banner */}
             {disabledSelectedCount > 0 && (
