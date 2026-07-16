@@ -197,3 +197,57 @@ jobs:
           set -euo pipefail
           cd "${REPO_WORK_DIR}"
           bash test/deploy.sh
+
+  provision-geoflow-runner:
+    name: Provision GEOFlow test runner
+    needs: deploy
+    runs-on:
+      - self-hosted
+      - linux
+      - aitoearn-test
+    timeout-minutes: 10
+    env:
+      REGISTRATION_TOKEN: ${{ secrets.GEOFLOW_RUNNER_REGISTRATION_TOKEN }}
+    steps:
+      - name: Register dedicated GEOFlow runner
+        if: ${{ env.REGISTRATION_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+
+          source_root="$(cd "$(dirname "${RUNNER_TEMP}")/.." && pwd)"
+          target_root="/home/btcfoxman/actions-runner-geoflow"
+
+          if [ ! -f "${target_root}/.runner" ]; then
+            mkdir -p "${target_root}"
+            for path in bin externals config.sh env.sh run.sh run-helper.sh.template runsvc.sh safe_sleep.sh svc.sh; do
+              if [ -e "${source_root}/${path}" ]; then
+                cp -a "${source_root}/${path}" "${target_root}/${path}"
+              fi
+            done
+
+            cd "${target_root}"
+            ./config.sh \
+              --unattended \
+              --url "https://github.com/btcfoxman/GEOFlow" \
+              --token "${REGISTRATION_TOKEN}" \
+              --name "geoflow-test-3-6" \
+              --labels "aitoearn-test" \
+              --work "_work" \
+              --replace
+          else
+            cd "${target_root}"
+          fi
+
+          if sudo -n true 2>/dev/null; then
+            if [ ! -f "/etc/systemd/system/actions.runner.btcfoxman-GEOFlow.geoflow-test-3-6.service" ]; then
+              sudo ./svc.sh install "$(id -un)"
+            fi
+            sudo ./svc.sh start
+            sudo ./svc.sh status
+          else
+            mkdir -p "${target_root}/_diag"
+            nohup env RUNNER_TRACKING_ID= ./run.sh >"${target_root}/_diag/background.log" 2>&1 </dev/null &
+            runner_pid=$!
+            sleep 5
+            kill -0 "${runner_pid}"
+          fi
