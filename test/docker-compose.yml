@@ -85,6 +85,10 @@ services:
     image: nginx:alpine
     container_name: aitoearn-test-nginx
     restart: unless-stopped
+    # The legacy 192.168.3.6 Docker seccomp profile rejects nginx pwrite64.
+    # Keep the exception scoped to the disposable test gateway container.
+    security_opt:
+      - seccomp=unconfined
     depends_on:
       aitoearn-web:
         condition: service_started
