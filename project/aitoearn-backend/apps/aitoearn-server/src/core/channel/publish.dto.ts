@@ -27,6 +27,14 @@ const WxGzhOptionSchema = z.object({
   tid: z.number().describe('分区 ID'),
 })
 
+const OrchestrationPublishOptionSchema = z.object({
+  contentType: z.enum(['image_text', 'article', 'weitoutiao']).optional(),
+  publishTargetId: z.string().optional(),
+  articleHtml: z.string().optional(),
+  articleBody: z.string().optional(),
+  params: z.record(z.string(), z.any()).optional(),
+})
+
 const FacebookOptionSchema = z.object({
   content_category: z.string().describe('内容分类'),
   content_tags: z.array(z.string()).optional().describe('内容标签'),
@@ -108,6 +116,7 @@ export const PlatOptionsSchema = z.object({
   tiktok: TiktokOptionSchema.optional().describe('TikTok 发布选项'),
   douyin: DouyinOptionSchema.optional().describe('抖音发布选项'),
   twitter: TwitterPublishOptionSchema.optional().describe('Twitter 发布选项'),
+  orchestration: OrchestrationPublishOptionSchema.optional().describe('ai-orchestration publish options'),
 })
 
 export const CreatePublishSchema = z.object({

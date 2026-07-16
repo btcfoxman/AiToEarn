@@ -33,6 +33,7 @@ const {
   VOLCENGINE_URL_AUTH_PRIMARY_KEY,
   OPENAI_API_KEY,
   OPENAI_BASE_URL,
+  OPENAI_TIMEOUT_MS,
   ANTHROPIC_BASE_URL,
   ANTHROPIC_API_KEY,
   GROK_API_KEY,
@@ -161,6 +162,7 @@ module.exports = {
     openai: {
       baseUrl: OPENAI_BASE_URL,
       apiKey: OPENAI_API_KEY,
+      timeout: Number(OPENAI_TIMEOUT_MS || 3 * 60 * 1000),
     },
     grok: {
       baseUrl: GROK_BASE_URL || 'https://api.x.ai',

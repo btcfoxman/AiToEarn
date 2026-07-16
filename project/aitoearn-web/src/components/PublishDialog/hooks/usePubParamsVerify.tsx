@@ -8,6 +8,7 @@ import { getTwitterPublishValidationMessages } from '@/components/PublishDialog/
 import { UploadTaskStatusEnum } from '@/components/PublishDialog/compoents/PublishManageUpload/publishManageUpload.enum'
 import { usePublishManageUpload } from '@/components/PublishDialog/compoents/PublishManageUpload/usePublishManageUpload'
 import {
+  isArticlePublishItem,
   isAspectRatioInRange,
   isAspectRatioMatch,
 } from '@/components/PublishDialog/PublishDialog.util'
@@ -104,6 +105,9 @@ const MEDIA_LIMITS = {
   wxGzh: {
     imageMaxSize: 10 * MB,
   },
+  wechatMoments: {
+    imageMaxSize: 10 * MB,
+  },
 } as const
 
 function hasOversizedImage(images: IImgFile[] | undefined, maxSize: number) {
@@ -132,6 +136,100 @@ function isTikTokImageFormatSupported(img: IImgFile) {
   return TIKTOK_ALLOWED_IMAGE_SUFFIXES.has(suffix.toLowerCase())
 }
 
+// 编排文章组件属于增强能力，目标不声明支持时只给警告，不阻断文章发布。
+type OptionalOrchestrationFeature = 'poll' | 'wechat_channel_video'
+
+const OPTIONAL_ORCHESTRATION_FEATURE_ALIASES: Record<string, OptionalOrchestrationFeature> = {
+  poll: 'poll',
+  vote: 'poll',
+  voting: 'poll',
+  wechat_channel_video: 'wechat_channel_video',
+  wechat_channels_video: 'wechat_channel_video',
+  video_channel: 'wechat_channel_video',
+  wx_channels_video: 'wechat_channel_video',
+  wx_sph_video: 'wechat_channel_video',
+}
+
+const OPTIONAL_ORCHESTRATION_FEATURE_LABELS: Record<OptionalOrchestrationFeature, string> = {
+  poll: '投票',
+  wechat_channel_video: '视频号视频',
+}
+
+function normalizeOptionalOrchestrationFeature(
+  value: unknown,
+): OptionalOrchestrationFeature | null {
+  const key = String(value ?? '')
+    .trim()
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase()
+  return OPTIONAL_ORCHESTRATION_FEATURE_ALIASES[key] ?? null
+}
+
+function normalizeOptionalOrchestrationFeatures(value: unknown): OptionalOrchestrationFeature[] {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,\s]+/)
+      : []
+  const result: OptionalOrchestrationFeature[] = []
+  for (const item of rawValues) {
+    const feature = normalizeOptionalOrchestrationFeature(item)
+    if (feature && !result.includes(feature)) {
+      result.push(feature)
+    }
+  }
+  return result
+}
+
+function orchestrationFeatureSourcesFromObject(value: unknown) {
+  const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return [
+    source.features,
+    source.publishFeatures,
+    source.publish_features,
+    source.supportedFeatures,
+    source.supported_features,
+  ]
+}
+
+function getDeclaredOrchestrationFeatureState(pubItem: PubItem) {
+  const externalMeta = pubItem.account.externalMeta as Record<string, unknown> | undefined
+  const capabilities = externalMeta?.capabilities as Record<string, unknown> | undefined
+  const targetSnapshot = externalMeta?.targetSnapshot as Record<string, unknown> | undefined
+  const snapshotCapabilities = targetSnapshot?.capabilities as Record<string, unknown> | undefined
+  const sources = [
+    ...orchestrationFeatureSourcesFromObject(externalMeta),
+    ...orchestrationFeatureSourcesFromObject(capabilities),
+    ...orchestrationFeatureSourcesFromObject(targetSnapshot),
+    ...orchestrationFeatureSourcesFromObject(snapshotCapabilities),
+  ].filter(value => value !== undefined)
+
+  const features = new Set<OptionalOrchestrationFeature>()
+  for (const source of sources) {
+    normalizeOptionalOrchestrationFeatures(source).forEach(feature => features.add(feature))
+  }
+  return {
+    declared: sources.length > 0,
+    features,
+  }
+}
+
+function getRequestedOptionalOrchestrationFeatures(pubItem: PubItem) {
+  const params = pubItem.params.option.orchestration?.params ?? {}
+  const requested = new Set<OptionalOrchestrationFeature>([
+    ...normalizeOptionalOrchestrationFeatures(params.requested_features),
+    ...normalizeOptionalOrchestrationFeatures(params.requestedFeatures),
+  ])
+
+  if (params.insert_poll === true) {
+    requested.add('poll')
+  }
+  if (params.insert_video_channel === true) {
+    requested.add('wechat_channel_video')
+  }
+  return Array.from(requested)
+}
+
 /**
  * 发布参数校验是否复合平台规范
  * @param data
@@ -148,8 +246,14 @@ export default function usePubParamsVerify(data: PubItem[]) {
     const errParamsMapTemp: ErrPubParamsMapType = new Map()
     for (const v of data) {
       const platInfo = AccountPlatInfoMap.get(v.account!.type)!
-      const { topics } = parseTopicString(v.params.des || '')
-      const topicsAll = [...new Set((v.params.topics ?? []).concat(topics))]
+      const isArticleContent = isArticlePublishItem(v)
+      const shouldParseTopics = !isArticleContent && v.account.type !== PlatType.WechatMoments
+      const { topics } = shouldParseTopics
+        ? parseTopicString(v.params.des || '')
+        : { topics: [] }
+      const topicsAll = shouldParseTopics
+        ? [...new Set((v.params.topics ?? []).concat(topics))]
+        : []
       const { topicMax } = platInfo.commonPubParamsConfig
       const video = v.params.video
 
@@ -262,7 +366,7 @@ export default function usePubParamsVerify(data: PubItem[]) {
       }
 
       // 话题数量校验
-      if (topicsAll.length > topicMax) {
+      if (shouldParseTopics && topicsAll.length > topicMax) {
         addErrorMsg(
           t('validation.topicMaxExceeded', {
             platformName: platInfo.name,
@@ -272,7 +376,7 @@ export default function usePubParamsVerify(data: PubItem[]) {
       }
 
       // 判断描述中的话题中间是否用空格分割，如：#话题1#话题2#话题3 这种格式错误
-      if (descTopicRegex.test(v.params.des || '')) {
+      if (shouldParseTopics && descTopicRegex.test(v.params.des || '')) {
         addErrorMsg(t('validation.topicFormatError'))
       }
 
@@ -359,11 +463,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
             if (isVideoSizeExceeded(video, MEDIA_LIMITS.facebook.videoMaxSize)) {
               addErrorMsg(t('validation.facebookVideoSize'))
             }
-            if (isVideoDurationOutOfRange(
-              video,
-              MEDIA_LIMITS.facebook.reelVideoMaxDuration,
-              MEDIA_LIMITS.facebook.reelVideoMinDuration,
-            )) {
+            if (
+              isVideoDurationOutOfRange(
+                video,
+                MEDIA_LIMITS.facebook.reelVideoMaxDuration,
+                MEDIA_LIMITS.facebook.reelVideoMinDuration,
+              )
+            ) {
               addErrorMsg(t('validation.facebookReelDuration'))
             }
             break
@@ -376,11 +482,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
             if (isVideoSizeExceeded(video, MEDIA_LIMITS.facebook.storyVideoMaxSize)) {
               addErrorMsg(t('validation.facebookStoryVideoSize'))
             }
-            if (isVideoDurationOutOfRange(
-              video,
-              MEDIA_LIMITS.facebook.storyVideoMaxDuration,
-              MEDIA_LIMITS.facebook.storyVideoMinDuration,
-            )) {
+            if (
+              isVideoDurationOutOfRange(
+                video,
+                MEDIA_LIMITS.facebook.storyVideoMaxDuration,
+                MEDIA_LIMITS.facebook.storyVideoMinDuration,
+              )
+            ) {
               addErrorMsg(t('validation.facebookStoryDuration'))
             }
             // facebook story 图片上限 ≤ 4MB
@@ -429,11 +537,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
             if (isVideoSizeExceeded(video, MEDIA_LIMITS.instagram.reelVideoMaxSize)) {
               addErrorMsg(t('validation.instagramReelVideoSize'))
             }
-            if (isVideoDurationOutOfRange(
-              video,
-              MEDIA_LIMITS.instagram.reelVideoMaxDuration,
-              MEDIA_LIMITS.instagram.reelVideoMinDuration,
-            )) {
+            if (
+              isVideoDurationOutOfRange(
+                video,
+                MEDIA_LIMITS.instagram.reelVideoMaxDuration,
+                MEDIA_LIMITS.instagram.reelVideoMinDuration,
+              )
+            ) {
               addErrorMsg(t('validation.instagramReelDuration'))
             }
             // instagram reel 视频宽高比限制：4:5 ~ 9:16 (0.8 ~ 0.5625)
@@ -450,11 +560,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
             if (isVideoSizeExceeded(video, MEDIA_LIMITS.instagram.storyVideoMaxSize)) {
               addErrorMsg(t('validation.instagramStoryVideoSize'))
             }
-            if (isVideoDurationOutOfRange(
-              video,
-              MEDIA_LIMITS.instagram.storyVideoMaxDuration,
-              MEDIA_LIMITS.instagram.storyVideoMinDuration,
-            )) {
+            if (
+              isVideoDurationOutOfRange(
+                video,
+                MEDIA_LIMITS.instagram.storyVideoMaxDuration,
+                MEDIA_LIMITS.instagram.storyVideoMinDuration,
+              )
+            ) {
               addErrorMsg(t('validation.instagramStoryDuration'))
             }
             break
@@ -489,11 +601,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
           addErrorMsg(t('validation.boardRequired'))
         }
         // Pinterest 视频限制，4 秒–15 分钟
-        if (isVideoDurationOutOfRange(
-          video,
-          MEDIA_LIMITS.pinterest.videoMaxDuration,
-          MEDIA_LIMITS.pinterest.videoMinDuration,
-        )) {
+        if (
+          isVideoDurationOutOfRange(
+            video,
+            MEDIA_LIMITS.pinterest.videoMaxDuration,
+            MEDIA_LIMITS.pinterest.videoMinDuration,
+          )
+        ) {
           addErrorMsg(t('validation.pinterestVideoDuration'))
         }
         // Pinterest 视频大小≤ 2GB
@@ -537,11 +651,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
           addErrorMsg(t('validation.tiktokImageFormat'))
         }
         // TikTok 视频时长限制 3 秒至 10 分钟
-        if (isVideoDurationOutOfRange(
-          video,
-          MEDIA_LIMITS.tiktok.videoMaxDuration,
-          MEDIA_LIMITS.tiktok.videoMinDuration,
-        )) {
+        if (
+          isVideoDurationOutOfRange(
+            video,
+            MEDIA_LIMITS.tiktok.videoMaxDuration,
+            MEDIA_LIMITS.tiktok.videoMinDuration,
+          )
+        ) {
           addErrorMsg(t('validation.tiktokVideoDuration'))
         }
         // TikTok视频大小限制4GB或更小
@@ -589,11 +705,13 @@ export default function usePubParamsVerify(data: PubItem[]) {
         if (isVideoSizeExceeded(video, MEDIA_LIMITS.linkedin.videoMaxSize)) {
           addErrorMsg(t('validation.linkedinVideoSize'))
         }
-        if (isVideoDurationOutOfRange(
-          video,
-          MEDIA_LIMITS.linkedin.videoMaxDuration,
-          MEDIA_LIMITS.linkedin.videoMinDuration,
-        )) {
+        if (
+          isVideoDurationOutOfRange(
+            video,
+            MEDIA_LIMITS.linkedin.videoMaxDuration,
+            MEDIA_LIMITS.linkedin.videoMinDuration,
+          )
+        ) {
           addErrorMsg(t('validation.linkedinVideoDuration'))
         }
       }
@@ -611,6 +729,12 @@ export default function usePubParamsVerify(data: PubItem[]) {
       // 微信公众号的强制校验
       if (v.account.type === PlatType.WxGzh) {
         if (hasOversizedImage(v.params.images, MEDIA_LIMITS.wxGzh.imageMaxSize)) {
+          addErrorMsg(t('validation.wxGzhImageSize'))
+        }
+      }
+
+      if (v.account.type === PlatType.WechatMoments) {
+        if (hasOversizedImage(v.params.images, MEDIA_LIMITS.wechatMoments.imageMaxSize)) {
           addErrorMsg(t('validation.wxGzhImageSize'))
         }
       }
@@ -670,6 +794,25 @@ export default function usePubParamsVerify(data: PubItem[]) {
       }
 
       // 如果有警告，保存到 Map 中
+      if (v.account.externalProvider === 'ai-orchestration' && v.account.type === PlatType.WxGzh) {
+        const requestedFeatures = getRequestedOptionalOrchestrationFeatures(v)
+        if (requestedFeatures.length > 0) {
+          const targetFeatureState = getDeclaredOrchestrationFeatureState(v)
+          const unsupportedFeatures = requestedFeatures.filter((feature) => {
+            return !targetFeatureState.declared || !targetFeatureState.features.has(feature)
+          })
+          if (unsupportedFeatures.length > 0) {
+            addWarningMsg(
+              t('validation.orchestrationFeatureBestEffort', {
+                features: unsupportedFeatures
+                  .map(feature => OPTIONAL_ORCHESTRATION_FEATURE_LABELS[feature])
+                  .join('、'),
+              }),
+            )
+          }
+        }
+      }
+
       if (warnings.length > 0) {
         warningParamsMapTemp.set(v.account.id, {
           parErrMsg: warnings[0], // 兼容旧版，显示第一个警告

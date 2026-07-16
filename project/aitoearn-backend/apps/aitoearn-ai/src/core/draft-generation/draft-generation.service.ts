@@ -27,12 +27,14 @@ import { ImageService } from '../ai/image/image.service'
 import { calculatePricingPoints, ChatPricing } from '../ai/pricing/pricing-calculator'
 import { VideoService } from '../ai/video/video.service'
 import { DraftGenerationMemoryService } from './draft-generation-memory.service'
-import { DraftGenerationPlannerService, ImageTextDraftPlanResult, VideoDraftPlanResult } from './draft-generation-planner.service'
+import { ArticleDraftPlanResult, DraftGenerationPlannerService, ImageTextDraftPlanResult, VideoDraftPlanResult } from './draft-generation-planner.service'
 import { getCompatibleAccountTypes } from './draft-generation-platforms'
 import {
   CreateDraftFromVideoUrlDto,
+  CreateArticleDraftDto,
   CreateDraftGenerationV2Dto,
   CreateImageTextDraftDto,
+  ArticleDraftType,
   DraftGenerationMemoryContentType,
   DraftType,
   ImageTextDraftType,
@@ -130,6 +132,20 @@ interface ImageTextDraftResponse {
   generatedImageCount?: number
   imageGenerationErrors?: ImageGenerationErrorDetail[]
   plan?: ImageTextDraftPlanResult
+}
+
+interface ArticleDraftResponse {
+  materialId?: string
+  title?: string
+  description?: string
+  topics?: string[]
+  coverUrl?: string
+  imageUrls?: string[]
+  requestedImageCount?: number
+  generatedImageCount?: number
+  imageGenerationErrors?: ImageGenerationErrorDetail[]
+  articleHtml?: string
+  plan?: ArticleDraftPlanResult
 }
 
 @Injectable()
@@ -465,6 +481,82 @@ export class DraftGenerationService {
     return aiLogIds
   }
 
+  async createArticleDrafts(userId: string, userType: UserType, dto: CreateArticleDraftDto): Promise<string[]> {
+    const resolvedGroupId = await this.resolveDraftGroupId(userId, dto.groupId)
+    const draftType = dto.draftType ?? 'article'
+    const plannerModel = dto.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+    const plannerModelConfig = config.ai.models.chat.find(model => model.name === plannerModel && model.scenes?.includes('draft-generation'))
+    if (!plannerModelConfig) {
+      throw new AppException(ResponseCode.InvalidModel)
+    }
+    const quantity = dto.quantity ?? 1
+    const imageModelConfig = dto.imageModel ? this.getImageTextDraftModelConfig(dto.imageModel) : undefined
+    const runtimeImageModel = dto.imageModel && imageModelConfig ? imageModelConfig.runtimeModel ?? dto.imageModel : undefined
+    const queuePriority = imageModelConfig?.queuePriority
+    const imageExecution = dto.imageModel ? this.resolveImageExecution(dto.imageModel, dto.imageUrls ?? [], dto.aspectRatio) : undefined
+    const estimatedImagePoints = dto.imageModel
+      ? this.getImageTextDraftPricingEntry(dto.imageModel, dto.imageSize).pricePerImage * (dto.imageCount ?? 3) * quantity
+      : 0
+    await this.assertUserCreditsSufficient(userId, userType, estimatedImagePoints)
+
+    const aiLogIds: string[] = []
+
+    for (let i = 0; i < quantity; i++) {
+      const aiLog = await this.aiLogRepository.create({
+        userId,
+        userType,
+        type: AiLogType.DraftGeneration,
+        model: plannerModelConfig.name,
+        channel: plannerModelConfig.channel as AiLogChannel,
+        status: AiLogStatus.Generating,
+        startedAt: new Date(),
+        points: 0,
+        request: {
+          groupId: resolvedGroupId,
+          version: 'v2-article',
+          prompt: dto.prompt,
+          captionPrompt: dto.captionPrompt,
+          imageUrls: dto.imageUrls,
+          imageModel: dto.imageModel,
+          imageCount: dto.imageCount,
+          imageSize: dto.imageSize,
+          aspectRatio: dto.aspectRatio,
+          draftType,
+          platforms: dto.platforms,
+          plannerModel,
+          runtimeImageModel,
+          queuePriority,
+          imageExecution,
+        },
+        response: {},
+      })
+
+      await this.addDraftGenerationJob({
+        aiLogId: aiLog.id,
+        userId,
+        userType,
+        groupId: resolvedGroupId,
+        version: 'v2-article',
+        prompt: dto.prompt,
+        captionPrompt: dto.captionPrompt,
+        imageUrls: dto.imageUrls,
+        imageModel: dto.imageModel,
+        imageCount: dto.imageCount,
+        imageSize: dto.imageSize,
+        aspectRatio: dto.aspectRatio,
+        articleDraftType: draftType,
+        platforms: dto.platforms,
+        plannerModel,
+        disableMemory: dto.disableMemory,
+        queuePriority,
+      })
+
+      aiLogIds.push(aiLog.id)
+    }
+
+    return aiLogIds
+  }
+
   /**
    * V2: 固定管线执行草稿内容生成（由 Consumer 调用）
    *
@@ -476,6 +568,208 @@ export class DraftGenerationService {
    *
    * 积分由 ChatService 和各 VideoService 内部自动扣除
    */
+  async generateContentArticle(
+    aiLogId: string,
+    userId: string,
+    userType: UserType,
+    groupId: string,
+    options: {
+      prompt: string
+      captionPrompt?: string
+      imageUrls?: string[]
+      imageModel?: string
+      imageCount?: number
+      imageSize?: string
+      aspectRatio?: string
+      draftType?: ArticleDraftType
+      platforms?: string[]
+      plannerModel?: string
+      disableMemory?: boolean
+    },
+  ): Promise<{ consumedPoints: number }> {
+    const existingAiLog = await this.aiLogRepository.getById(aiLogId)
+    const existing = (existingAiLog?.response ?? {}) as ArticleDraftResponse
+    let consumedPoints = existingAiLog?.points ?? 0
+    const startTime = Date.now()
+    const draftType = options.draftType ?? 'article'
+    let resolvedPlannerModel = existingAiLog?.model ?? options.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+
+    try {
+      const referenceImageUrls = options.imageUrls ?? []
+      const targetImageCount = options.imageModel ? options.imageCount ?? 3 : 0
+      let plan = existing.plan
+      if (plan) {
+        this.logger.log({ aiLogId }, 'Article: Reusing plan from previous attempt')
+      }
+      else {
+        const memoryItems = options.disableMemory
+          ? []
+          : (await this.draftGenerationMemoryService.getPlannerMemoryContext(userId, DraftGenerationMemoryContentType.ImageText)).memoryItems
+        const planned = await this.draftGenerationPlannerService.planArticle({
+          userId,
+          contentType: DraftGenerationMemoryContentType.ImageText,
+          plannerModel: options.plannerModel,
+          userPrompt: options.prompt,
+          captionPrompt: options.captionPrompt,
+          memoryItems,
+          referenceImageUrls,
+          platforms: options.platforms,
+          imageModel: options.imageModel,
+          imageCount: targetImageCount,
+          imageSize: options.imageSize,
+          aspectRatio: options.aspectRatio,
+        })
+        plan = planned.plan
+        resolvedPlannerModel = planned.model
+
+        await this.aiLogRepository.updateById(aiLogId, {
+          $set: { 'response.plan': plan, 'request.plannerModel': planned.model },
+        })
+
+        this.logger.log(
+          { aiLogId, title: plan.title, plannerModel: planned.model },
+          'Article: Planning completed',
+        )
+      }
+
+      let generatedImageUrls = targetImageCount > 0 ? (existing.imageUrls ?? []).slice(0, targetImageCount) : []
+      let imageGenerationErrors = existing.imageGenerationErrors ?? []
+
+      if (targetImageCount > 0 && options.imageModel) {
+        const imageExecution = this.resolveImageExecution(options.imageModel, referenceImageUrls, options.aspectRatio)
+        const fallbackImagePrompt = `${plan.title}\n\n${plan.description}`.slice(0, 1000)
+        const imagePromptTasks = Array.from({ length: targetImageCount }, (_, promptIndex) => ({
+          prompt: plan.imagePrompts?.[promptIndex] ?? plan.imagePrompts?.[0] ?? fallbackImagePrompt,
+          promptIndex,
+        }))
+
+        const updateImageProgress = async (
+          imageUrls: string[],
+          points: number,
+          errors: ImageGenerationErrorDetail[] = [],
+        ) => {
+          await this.aiLogRepository.updateById(aiLogId, {
+            $set: {
+              'points': points,
+              'response.title': plan.title,
+              'response.description': plan.description,
+              'response.topics': plan.topics,
+              'response.articleHtml': plan.articleHtml,
+              'response.plan': plan,
+              'response.coverUrl': imageUrls[0],
+              'response.imageUrls': [...imageUrls],
+              'response.requestedImageCount': targetImageCount,
+              'response.generatedImageCount': imageUrls.length,
+              'response.imageGenerationErrors': [...errors],
+            },
+          })
+        }
+
+        if (generatedImageUrls.length < targetImageCount) {
+          const missingPromptTasks = imagePromptTasks.slice(generatedImageUrls.length, targetImageCount)
+          const progressImageUrls = [...generatedImageUrls]
+          const { urls, points: imagePoints, imageGenerationErrors: generationErrors } = await this.generateImages(
+            userId,
+            userType,
+            options.imageModel,
+            missingPromptTasks,
+            imageExecution,
+            referenceImageUrls,
+            options.aspectRatio,
+            options.imageSize,
+            async (imageUrl, points, errors) => {
+              if (progressImageUrls.length < targetImageCount) {
+                progressImageUrls.push(imageUrl)
+              }
+              await updateImageProgress(progressImageUrls, consumedPoints + points, [
+                ...imageGenerationErrors,
+                ...errors,
+              ])
+            },
+          )
+
+          generatedImageUrls = progressImageUrls.length > generatedImageUrls.length
+            ? progressImageUrls.slice(0, targetImageCount)
+            : [...generatedImageUrls, ...urls].slice(0, targetImageCount)
+          imageGenerationErrors = [...imageGenerationErrors, ...generationErrors]
+          consumedPoints += imagePoints
+          await updateImageProgress(generatedImageUrls, consumedPoints, imageGenerationErrors)
+
+          if (generatedImageUrls.length < targetImageCount) {
+            throw new Error(`Article: generated ${generatedImageUrls.length}/${targetImageCount} images`)
+          }
+        }
+      }
+
+      const coverUrl = generatedImageUrls[0]
+      const materialId = existing.materialId ?? (await this.materialRepository.create({
+        userId,
+        userType,
+        groupId,
+        type: MaterialType.ARTICLE,
+        source: MaterialSource.PlaceDraft,
+        status: MaterialStatus.SUCCESS,
+        title: plan.title,
+        desc: plan.description,
+        topics: plan.topics,
+        coverUrl,
+        mediaList: generatedImageUrls.map(url => ({ url, type: MediaType.IMG })),
+        useCount: 0,
+        autoDeleteMedia: false,
+        model: resolvedPlannerModel,
+        option: {
+          articleHtml: plan.articleHtml,
+        },
+        generationParams: {
+          draftType,
+          ...options,
+        },
+        accountTypes: (options.platforms as AccountType[]) ?? getCompatibleAccountTypes({
+          type: 'article',
+          title: plan.title,
+          desc: plan.description,
+          topics: plan.topics,
+          imageCount: generatedImageUrls.length,
+          aspectRatio: options.aspectRatio,
+        }),
+      })).id
+
+      const response: ArticleDraftResponse = {
+        materialId,
+        title: plan.title,
+        description: plan.description,
+        topics: plan.topics,
+        coverUrl,
+        imageUrls: generatedImageUrls,
+        requestedImageCount: targetImageCount || undefined,
+        generatedImageCount: targetImageCount > 0 ? generatedImageUrls.length : undefined,
+        imageGenerationErrors,
+        articleHtml: plan.articleHtml,
+        plan,
+      }
+
+      await this.aiLogRepository.updateById(aiLogId, {
+        $set: {
+          status: AiLogStatus.Success,
+          model: resolvedPlannerModel,
+          points: consumedPoints,
+          duration: Date.now() - startTime,
+          response,
+        },
+      })
+
+      return { consumedPoints }
+    }
+    catch (error) {
+      this.logger.error(error, `v2 generateContentArticle failed aiLogId=${aiLogId}, userId=${userId}, groupId=${groupId}, consumedPoints=${consumedPoints}`)
+      throw new DraftGenerationError(
+        getErrorMessage(error),
+        consumedPoints,
+        error,
+      )
+    }
+  }
+
   async generateContentV2(
     aiLogId: string,
     userId: string,
@@ -739,7 +1033,6 @@ export class DraftGenerationService {
     const imageModels = config.ai.draftGeneration.imageModels
 
     const videoModels = config.ai.models.video.generation
-      .filter(v => v.channel === AiLogChannel.Grok)
 
     return { imageModels, videoModels }
   }

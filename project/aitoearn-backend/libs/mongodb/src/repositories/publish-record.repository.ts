@@ -540,6 +540,7 @@ export class PublishRecordRepository extends BaseRepository<PublishRecord> {
         errorMsg: '',
         dataId,
         workLink: data?.workLink,
+        ...(data?.dataOption !== undefined && { dataOption: data.dataOption }),
         publishTime: new Date(),
         queued: false,
         inQueue: false,

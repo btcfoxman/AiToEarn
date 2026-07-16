@@ -28,6 +28,7 @@ import PubParmasTextarea from '@/components/PublishDialog/compoents/PubParmasTex
 import TextSelectionToolbar from '@/components/PublishDialog/compoents/TextSelectionToolbar'
 import { useAccountClickHandler } from '@/components/PublishDialog/hooks/useAccountClickHandler'
 import { usePlatformAuth } from '@/components/PublishDialog/hooks/usePlatformAuth'
+import { isArticlePublishItem } from '@/components/PublishDialog/PublishDialog.util'
 import { usePublishDialog } from '@/components/PublishDialog/usePublishDialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -196,7 +197,10 @@ export const DesktopPublishContent = memo(
     // 处理参数变更
     const handleParamsChange = useCallback(
       (values: { value?: string, imgs?: IImgFile[], video?: any }) => {
-        const { topics } = parseTopicString(values.value || '')
+        const shouldParseTopics = pubListChoosed.some(item => !isArticlePublishItem(item))
+        const { topics } = shouldParseTopics
+          ? parseTopicString(values.value || '')
+          : { topics: [] }
         setAccountAllParams({
           des: values.value,
           images: values.imgs,
@@ -204,7 +208,7 @@ export const DesktopPublishContent = memo(
           topics,
         })
       },
-      [setAccountAllParams],
+      [pubListChoosed, setAccountAllParams],
     )
 
     // ============ Effects ============
@@ -427,6 +431,7 @@ export const DesktopPublishContent = memo(
                       imageFileListValue={commonPubParams.images}
                       onChange={handleParamsChange}
                       onImageToImage={onImageToImage}
+                      enableTopicMentions={pubListChoosed.some(item => !isArticlePublishItem(item))}
                     />
                   )}
                 </>

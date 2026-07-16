@@ -3,7 +3,7 @@
  * 包含推广计划、素材、统计数据相关类型
  */
 
-import type { DraftGenerationRequest, ImageTextDraftType, VideoDraftType } from '@/api/draftGeneration'
+import type { ArticleDraftType, DraftGenerationRequest, ImageTextDraftType, VideoDraftType } from '@/api/draftGeneration'
 import type { PlatType } from '@/app/config/platConfig'
 import type { PubType } from '@/app/config/publishConfig'
 
@@ -61,7 +61,7 @@ export interface MaterialMedia {
 /** AI 生成参数 */
 export interface MaterialGenerationParams extends DraftGenerationRequest {
   platforms?: PlatType[]
-  draftType?: VideoDraftType | ImageTextDraftType
+  draftType?: VideoDraftType | ImageTextDraftType | ArticleDraftType
   videoUrls?: string[]
 }
 

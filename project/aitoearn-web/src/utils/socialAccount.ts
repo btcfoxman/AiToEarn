@@ -4,6 +4,7 @@ import { PlatType } from '@/app/config/platConfig'
 const temporaryUnavailableFansPlatforms = new Set<PlatType>([
   PlatType.Douyin,
   PlatType.WxGzh,
+  PlatType.WechatMoments,
 ])
 
 export function calcSocialAccountsTotalFans(accounts: Array<Pick<SocialAccount, 'fansCount'>>) {

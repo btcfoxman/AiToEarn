@@ -68,7 +68,53 @@ export interface IXhsUserDeclarationBind {
 }
 
 // 发布 每个平台的独有参数
+export type OrchestrationPublishContentType = 'image_text' | 'article' | 'weitoutiao'
+export type OrchestrationPublishFeature =
+  | 'rich_text'
+  | 'image'
+  | 'video'
+  | 'wechat_channel_video'
+  | 'poll'
+export type OrchestrationFeaturePolicy = 'best_effort' | 'strict'
+
+export interface OrchestrationArticlePollBlock {
+  type: 'poll'
+  question?: string
+  options?: string[]
+  multiSelect?: boolean
+}
+
+export interface OrchestrationArticleWechatChannelVideoBlock {
+  type: 'wechat_channel_video'
+  title?: string
+  keyword?: string
+  feedId?: string
+  url?: string
+}
+
+export type OrchestrationArticleBlock =
+  | OrchestrationArticlePollBlock
+  | OrchestrationArticleWechatChannelVideoBlock
+  | { type: 'rich_text' | 'image' | 'video'; [key: string]: unknown }
+
 export interface IPlatOption {
+  orchestration?: {
+    contentType?: OrchestrationPublishContentType
+    publishTargetId?: string
+    articleHtml?: string
+    articleBody?: string
+    params?: Record<string, unknown> & {
+      articleBlocks?: OrchestrationArticleBlock[]
+      article_blocks?: OrchestrationArticleBlock[]
+      featurePolicy?: OrchestrationFeaturePolicy
+      feature_policy?: OrchestrationFeaturePolicy
+      requestedFeatures?: OrchestrationPublishFeature[]
+      requested_features?: OrchestrationPublishFeature[]
+      moments_visibility?: 'public' | 'partial' | 'private' | 'exclude' | string
+      moments_visible_label?: string
+      moments_visible_labels?: string[]
+    }
+  }
   bilibili?: {
     // 分区ID，由获取分区信息接口得到
     tid?: number

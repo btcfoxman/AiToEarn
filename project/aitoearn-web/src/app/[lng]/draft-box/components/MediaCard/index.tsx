@@ -44,7 +44,7 @@ function formatDuration(seconds?: number): string {
 
 export const MediaCard = memo(({ media, onClick, batchMode, selected, onToggleSelect, actions }: MediaCardProps) => {
   const isVideo = media.type === 'video'
-  const thumbUrl = media.thumbUrl ? getOssUrl(media.thumbUrl) : media.url ? getOssUrl(media.url) : '/images/placeholder.png'
+  const thumbUrl = media.thumbUrl ? getOssUrl(media.thumbUrl) : media.url ? getOssUrl(media.url) : ''
   const duration = media.metadata?.duration
 
   const handleClick = useCallback(() => {

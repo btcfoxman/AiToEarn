@@ -180,6 +180,9 @@ export const GenerationParamsCard = memo(({
     if (params.draftType === 'image')
       return t('detail.draftModeOffImage')
 
+    if (params.draftType === 'article')
+      return `${t('detail.draftModeOn')}(${t('detail.contentTypeArticle')})`
+
     return null
   }, [params?.draftType, t])
 

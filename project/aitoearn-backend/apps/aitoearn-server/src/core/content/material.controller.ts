@@ -53,6 +53,21 @@ function getMaterialTypeByAccountType(accountType: AccountType): MaterialType | 
   return undefined
 }
 
+function stripHeavyListOption(item: any) {
+  const orchestration = item?.option?.orchestration
+  if (!orchestration || typeof orchestration !== 'object' || !('raw' in orchestration)) {
+    return
+  }
+  item.option = {
+    ...item.option,
+    orchestration: {
+      ...orchestration,
+      raw: undefined,
+    },
+  }
+  delete item.option.orchestration.raw
+}
+
 @ApiTags('Me/Material')
 @Controller('material')
 export class MaterialController {
@@ -230,6 +245,7 @@ export class MaterialController {
     )
 
     for (const item of res.list) {
+      stripHeavyListOption(item)
       if (item.coverUrl)
         item.coverUrl = FileUtil.buildUrl(item.coverUrl)
       for (const media of item.mediaList) {

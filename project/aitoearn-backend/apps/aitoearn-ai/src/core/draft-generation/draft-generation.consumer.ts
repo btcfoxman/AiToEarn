@@ -35,7 +35,28 @@ abstract class DraftGenerationConsumerBase extends WorkerHost {
     }
 
     try {
-      if (version === 'v2-image-text') {
+      if (version === 'v2-article') {
+        const { prompt, captionPrompt, imageUrls, imageModel, imageCount, imageSize, aspectRatio, articleDraftType, platforms, plannerModel, disableMemory } = job.data
+        this.logger.log(
+          { aiLogId, imageModel, imageCount, aspectRatio, imageUrlsCount: imageUrls?.length ?? 0, promptLength: prompt?.length ?? 0, draftType: articleDraftType },
+          'Processing v2-article generation',
+        )
+        const { consumedPoints } = await this.draftGenerationService.generateContentArticle(aiLogId, userId, userType, groupId, {
+          prompt: prompt ?? '',
+          captionPrompt,
+          imageUrls,
+          imageModel,
+          imageCount,
+          imageSize,
+          aspectRatio,
+          draftType: articleDraftType,
+          platforms,
+          plannerModel,
+          disableMemory,
+        })
+        this.logger.log({ aiLogId, consumedPoints }, 'v2-article generation completed')
+      }
+      else if (version === 'v2-image-text') {
         const { prompt, captionPrompt, imageUrls, imageModel, imageCount, imageSize, aspectRatio, imageTextDraftType, platforms, plannerModel, disableMemory } = job.data
         this.logger.log(
           { aiLogId, imageModel, imageCount, aspectRatio, imageUrlsCount: imageUrls?.length ?? 0, promptLength: prompt?.length ?? 0, draftType: imageTextDraftType },

@@ -11,6 +11,7 @@ import {
 } from '../draft-generation/draft-generation.vo'
 import {
   InternalCreateDraftV2Dto,
+  InternalCreateArticleDraftDto,
   InternalCreateImageTextDraftDto,
   InternalGetDraftTaskDto,
   InternalListDraftTasksDto,
@@ -44,6 +45,17 @@ export class DraftGenerationInternalController {
   @Post('ai/draft-generation/image-text')
   async createImageTextDrafts(@Body() body: InternalCreateImageTextDraftDto): Promise<CreateDraftGenerationVo> {
     const taskIds = await this.draftGenerationService.createImageTextDrafts(body.userId, body.userType, body)
+    return CreateDraftGenerationVo.create({ taskIds })
+  }
+
+  @ApiDoc({
+    summary: 'ç”Ÿæˆæ–‡ç« å†…å®¹è‰ç¨¿',
+    body: InternalCreateArticleDraftDto.schema,
+    response: CreateDraftGenerationVo,
+  })
+  @Post('ai/draft-generation/article')
+  async createArticleDrafts(@Body() body: InternalCreateArticleDraftDto): Promise<CreateDraftGenerationVo> {
+    const taskIds = await this.draftGenerationService.createArticleDrafts(body.userId, body.userType, body)
     return CreateDraftGenerationVo.create({ taskIds })
   }
 

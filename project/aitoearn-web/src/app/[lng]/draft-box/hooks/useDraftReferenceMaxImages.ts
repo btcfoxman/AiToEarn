@@ -17,7 +17,7 @@ export function useDraftReferenceMaxImages(groupId: string) {
   const config = configSnapshot ?? getConfig(groupId)
 
   return useMemo(() => {
-    if (config.contentType === 'image_text') {
+    if (config.contentType === 'image_text' || config.contentType === 'article') {
       const currentImageModelInfo = pricingData?.imageModels?.find(model => model.model === config.imageModel)
       return currentImageModelInfo?.maxInputImages ?? DEFAULT_MAX_INPUT_IMAGES
     }

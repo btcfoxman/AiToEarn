@@ -7,6 +7,7 @@
 'use client'
 
 import type { DraftListSectionTab } from '../DraftListSection'
+import type { PromotionMaterial } from '@/app/[lng]/brand-promotion/brandPromotionStore/types'
 import type { IPubParams } from '@/components/PublishDialog/publishDialog.type'
 import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo } from 'react'
@@ -44,6 +45,75 @@ interface DraftContentModuleProps {
   showVideoCreateDraftTaskWidget?: boolean
   /** 内容区域外层样式 */
   contentClassName?: string
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
+
+function resolveArticleHtml(option?: Record<string, unknown>): string | undefined {
+  const directHtml = option?.articleHtml
+  if (typeof directHtml === 'string' && directHtml.trim())
+    return directHtml
+
+  const article = asRecord(option?.article)
+  const articleHtml = article?.html
+  if (typeof articleHtml === 'string' && articleHtml.trim())
+    return articleHtml
+
+  const orchestration = asRecord(option?.orchestration)
+  const orchestrationHtml = orchestration?.articleHtml
+  if (typeof orchestrationHtml === 'string' && orchestrationHtml.trim())
+    return orchestrationHtml
+
+  return undefined
+}
+
+function htmlToText(value?: string): string {
+  return (value || '')
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|section|article|blockquote|h[1-6]|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function resolveArticleBody(material: PromotionMaterial): string {
+  const option = material.option
+  const article = asRecord(option?.article)
+  const articleBody = article?.body
+  if (typeof articleBody === 'string' && articleBody.trim())
+    return articleBody.trim()
+
+  const orchestration = asRecord(option?.orchestration)
+  const orchestrationBody = orchestration?.articleBody
+  if (typeof orchestrationBody === 'string' && orchestrationBody.trim())
+    return orchestrationBody.trim()
+
+  return htmlToText(resolveArticleHtml(option)) || material.desc || ''
+}
+
+function isArticleMaterial(material?: PromotionMaterial | null): boolean {
+  if (!material)
+    return false
+  if (material.generationParams?.draftType === 'article')
+    return true
+  const option = material.option
+  if (resolveArticleHtml(option))
+    return true
+  const article = asRecord(option?.article)
+  if (article)
+    return true
+  const orchestration = asRecord(option?.orchestration)
+  return orchestration?.contentType === 'article'
 }
 
 function DraftContentModule({
@@ -117,7 +187,8 @@ function DraftContentModule({
     if (!publishingDraft)
       return undefined
     const isVideo = publishingDraft.mediaList?.some(m => m.type === 'video')
-    const targetPubType = isVideo ? PubType.VIDEO : PubType.ImageText
+    const isArticleDraft = isArticleMaterial(publishingDraft)
+    const targetPubType = isVideo ? PubType.VIDEO : isArticleDraft ? PubType.Article : PubType.ImageText
 
     return accountList
       .filter((acc) => {
@@ -139,18 +210,45 @@ function DraftContentModule({
 
       store.setPrefillLoading(true)
 
+      const isArticleDraft = isArticleMaterial(publishingDraft)
       const params: Partial<IPubParams> = {
         des: publishingDraft.desc || '',
         title: publishingDraft.title || '',
-        topics: publishingDraft.topics,
+        topics: isArticleDraft ? [] : publishingDraft.topics,
       }
 
       // 将话题拼接到描述末尾，以便 Lexical 编辑器渲染为 mention 节点
-      if (publishingDraft.topics?.length) {
+      if (!isArticleDraft && publishingDraft.topics?.length) {
         const topicStr = publishingDraft.topics.map(t => `#${t}`).join(' ')
         params.des = `${params.des || ''}\n${topicStr}`.trim()
       }
 
+      if (isArticleDraft) {
+        const articleHtml = resolveArticleHtml(publishingDraft.option)
+        const articleBody = resolveArticleBody(publishingDraft)
+        params.des = articleBody
+        params.option = {
+          orchestration: {
+            contentType: 'article',
+            ...(articleHtml ? { articleHtml } : {}),
+            ...(articleBody ? { articleBody } : {}),
+          },
+        }
+      }
+
+      const draftImages = publishingDraft.mediaList
+        ?.filter(m => m.type === 'img')
+        .map((m, i) => ({
+          id: `draft-img-${i}`,
+          size: 0,
+          file: new File([], ''),
+          imgUrl: m.url,
+          filename: '',
+          imgPath: '',
+          width: 0,
+          height: 0,
+          ossUrl: m.url,
+        })) || []
       const videoMedia = publishingDraft.mediaList?.find(m => m.type === 'video')
       if (videoMedia) {
         try {
@@ -203,22 +301,10 @@ function DraftContentModule({
             },
           }
         }
-        params.images = []
+        params.images = isArticleDraft ? draftImages : []
       }
       else {
-        params.images = publishingDraft.mediaList
-          ?.filter(m => m.type === 'img')
-          .map((m, i) => ({
-            id: `draft-img-${i}`,
-            size: 0,
-            file: new File([], ''),
-            imgUrl: m.url,
-            filename: '',
-            imgPath: '',
-            width: 0,
-            height: 0,
-            ossUrl: m.url,
-          })) || []
+        params.images = draftImages
       }
 
       store.setAccountAllParams(params)

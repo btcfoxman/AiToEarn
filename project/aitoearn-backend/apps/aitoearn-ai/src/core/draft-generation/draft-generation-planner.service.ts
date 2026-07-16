@@ -28,6 +28,16 @@ export const ImageTextDraftPlanResultSchema = z.object({
 
 export type ImageTextDraftPlanResult = z.infer<typeof ImageTextDraftPlanResultSchema>
 
+export const ArticleDraftPlanResultSchema = z.object({
+  title: z.string().max(200).describe('Article title'),
+  description: z.string().min(1).max(10000).describe('Article body in plain text or markdown'),
+  topics: z.array(z.string()).max(5).describe('Topic tags without # prefix'),
+  articleHtml: z.string().max(20000).optional().describe('Optional semantic HTML body for rich article publishing'),
+  imagePrompts: z.array(z.string().min(1).max(1000)).max(9).optional().describe('Optional prompts for article illustration images'),
+})
+
+export type ArticleDraftPlanResult = z.infer<typeof ArticleDraftPlanResultSchema>
+
 type PlannerModelConfig = (typeof config.ai.models.chat)[number]
 interface BasePlanInput {
   userId: string
@@ -52,6 +62,15 @@ interface ImageTextPlanInput extends BasePlanInput {
   imageModel: string
   captionPrompt?: string
   imageCount: number
+  imageSize?: string
+  aspectRatio?: string
+}
+
+interface ArticlePlanInput extends BasePlanInput {
+  contentType: typeof DraftGenerationMemoryContentType.ImageText
+  captionPrompt?: string
+  imageModel?: string
+  imageCount?: number
   imageSize?: string
   aspectRatio?: string
 }
@@ -91,6 +110,22 @@ export class DraftGenerationPlannerService {
     const plan = await this.invokeStructuredPlanner(modelConfig, prompt, ImageTextDraftPlanResultSchema, input.referenceImageUrls)
     if (plan.imagePrompts.length !== input.imageCount) {
       plan.imagePrompts = Array.from({ length: input.imageCount }, (_, index) => plan.imagePrompts[index] ?? plan.imagePrompts[0] ?? input.userPrompt ?? '')
+    }
+    return { plan, model: modelConfig.name }
+  }
+
+  async planArticle(input: ArticlePlanInput): Promise<{ plan: ArticleDraftPlanResult, model: string }> {
+    const modelName = input.plannerModel ?? config.ai.draftGeneration.planner.defaultModel
+    const modelConfig = config.ai.models.chat.find(model => model.name === modelName && model.scenes?.includes('draft-generation'))
+    if (!modelConfig) {
+      throw new AppException(ResponseCode.InvalidModel)
+    }
+    const prompt = this.buildArticlePrompt(input)
+    const plan = await this.invokeStructuredPlanner(modelConfig, prompt, ArticleDraftPlanResultSchema, input.referenceImageUrls)
+    if (input.imageCount && input.imageCount > 0) {
+      const fallbackPrompt = `${plan.title}\n\n${plan.description}`.slice(0, 1000)
+      plan.imagePrompts = Array.from({ length: input.imageCount }, (_, index) =>
+        plan.imagePrompts?.[index] ?? plan.imagePrompts?.[0] ?? fallbackPrompt)
     }
     return { plan, model: modelConfig.name }
   }
@@ -257,6 +292,50 @@ ${this.formatList(input.memoryItems)}
 - imagePrompts: exactly ${input.imageCount} prompts for image generation in the SAME language as the user prompt. Split carousel/page-style requests into different page goals when applicable. Keep explicit on-image text unchanged. Do NOT translate or include non-image output format constraints or character limits in the imagePrompts.`
   }
 
+  private buildArticlePrompt(input: ArticlePlanInput): string {
+    const captionPrompt = input.captionPrompt?.trim()
+    const promptLabel = captionPrompt ? 'Article Prompt' : 'Current User Prompt'
+    const imageOutputRequirement = input.imageModel && input.imageCount
+      ? `- imagePrompts: exactly ${input.imageCount} prompts for article illustration image generation. Keep the same language as the user prompt and align each prompt to a useful section of the article.`
+      : '- imagePrompts: omit unless article illustration images are explicitly requested.'
+
+    return `You are an AI article draft planner for WeChat Official Account and Toutiao publishing.
+
+## System Rules
+- The current user prompt has higher priority than memory.
+- Merge memory naturally when relevant; do not say "based on your memory".
+- Generate title, description, topics, and articleHtml in the SAME language as the user prompt unless the user explicitly asks otherwise.
+- Keep the article useful, publishable, and factually cautious. Do not invent unsupported data, quotes, sources, or named cases.
+- For WeChat Official Account and Toutiao article publishing, prefer clear headings, short paragraphs, practical examples, and a concise conclusion.
+- If the target platform includes toutiao with micro-post style, keep the article body compact enough to be reusable as a Toutiao article or Weitoutiao source.
+- articleHtml is optional but recommended. Use semantic tags only: h2, h3, p, ul, ol, li, strong, em, blockquote. Do not include html/body/head/script/style tags.
+
+## ${promptLabel}
+${input.userPrompt || ''}
+
+## Additional Caption/Style Constraints
+${captionPrompt || 'None'}
+
+## User Memory
+${this.formatList(input.memoryItems)}
+
+## Generation Context
+- Content Type: article
+- Platforms: ${input.platforms?.join(', ') || 'default'}
+- Image Model: ${input.imageModel || 'none'}
+- Image Count: ${input.imageCount ?? 0}
+- Image Size: ${input.imageSize ?? 'default'}
+- Aspect Ratio: ${input.aspectRatio ?? 'default'}
+- Reference Images: ${input.referenceImageUrls?.join(', ') || 'none'}
+
+## Output Requirements
+- title: a concise publishable title.
+- description: the full article body, not a short social caption. Use paragraphs and section headings when helpful.
+- topics: 3-5 relevant topic tags without #.
+- articleHtml: semantic HTML version of the same article body when possible.
+${imageOutputRequirement}`
+  }
+
   private formatList(items: string[]): string {
     if (items.length === 0) {
       return 'None'
@@ -272,7 +351,26 @@ ${this.formatList(input.memoryItems)}
     referenceVideoUrls: string[] = [],
   ): Promise<T> {
     const model = this.createPlannerModel(modelConfig)
-    const messages = this.buildMessages(prompt, referenceImageUrls, referenceVideoUrls)
+    const useTextJsonPlanner = this.shouldUseTextJsonPlanner(modelConfig)
+    const messages = this.buildMessages(
+      useTextJsonPlanner ? this.withJsonResponseInstruction(prompt) : prompt,
+      referenceImageUrls,
+      referenceVideoUrls,
+    )
+    if (useTextJsonPlanner) {
+      const { text } = await this.aiAvailability.execute(
+        { provider: modelConfig.channel, operation: 'draftGeneration.planner', model: modelConfig.name },
+        async () => await generateText({
+          model,
+          messages,
+          maxRetries: 1,
+          temperature: 0.4,
+        }),
+      )
+
+      return this.parsePlannerJson(text, schema)
+    }
+
     const { output } = await this.aiAvailability.execute(
       { provider: modelConfig.channel, operation: 'draftGeneration.planner', model: modelConfig.name },
       async () => await generateText({
@@ -285,6 +383,90 @@ ${this.formatList(input.memoryItems)}
     )
 
     return output
+  }
+
+  private shouldUseTextJsonPlanner(modelConfig: PlannerModelConfig): boolean {
+    return modelConfig.channel === AiLogChannel.OpenAI && /^claude-/i.test(modelConfig.name)
+  }
+
+  private withJsonResponseInstruction(prompt: string): string {
+    return `${prompt}
+
+## Required Response Format
+Return exactly one valid JSON object and nothing else.
+- Do not wrap the response in Markdown fences.
+- Do not include explanatory text before or after the JSON.
+- The response must be parseable by JSON.parse.
+- Use double quotes for JSON keys and string values.
+- Escape double quotes and newlines inside string values.
+- Use arrays for list fields such as topics and imagePrompts.
+- Do not include trailing commas.`
+  }
+
+  private parsePlannerJson<T extends Record<string, unknown>>(text: string, schema: z.ZodType<T>): T {
+    const candidates = [
+      text.trim(),
+      this.extractMarkdownJson(text),
+      this.extractFirstJsonObject(text),
+    ].filter((candidate): candidate is string => Boolean(candidate?.trim()))
+
+    let lastParseError: unknown
+    for (const candidate of candidates) {
+      try {
+        return schema.parse(JSON.parse(candidate))
+      }
+      catch (error) {
+        lastParseError = error
+      }
+    }
+
+    const detail = lastParseError instanceof Error ? `: ${lastParseError.message}` : ''
+    throw new Error(`Planner model did not return valid JSON${detail}`)
+  }
+
+  private extractMarkdownJson(text: string): string | undefined {
+    return text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim()
+  }
+
+  private extractFirstJsonObject(text: string): string | undefined {
+    const start = text.indexOf('{')
+    if (start === -1) {
+      return undefined
+    }
+
+    let depth = 0
+    let inString = false
+    let escaping = false
+    for (let index = start; index < text.length; index++) {
+      const char = text[index]
+      if (inString) {
+        if (escaping) {
+          escaping = false
+        }
+        else if (char === '\\') {
+          escaping = true
+        }
+        else if (char === '"') {
+          inString = false
+        }
+        continue
+      }
+
+      if (char === '"') {
+        inString = true
+      }
+      else if (char === '{') {
+        depth++
+      }
+      else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          return text.slice(start, index + 1)
+        }
+      }
+    }
+
+    return undefined
   }
 
   private buildMessages(prompt: string, referenceImageUrls: string[], referenceVideoUrls: string[]): ModelMessage[] {

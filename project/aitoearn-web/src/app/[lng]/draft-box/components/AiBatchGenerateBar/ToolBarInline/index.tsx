@@ -148,10 +148,14 @@ const ToolBarInline = memo(
     const { t } = useTransClient(['brandPromotion', 'route'])
 
     const isVideoMode = contentType === 'video'
+    const isArticleMode = contentType === 'article'
+    const usesImageGeneration = contentType === 'image_text' || isArticleMode
 
-    const imageCountLabel = isDraftMode
-      ? t('detail.imageTextDraftImageCount')
-      : t('detail.imageCount')
+    const imageCountLabel = isArticleMode
+      ? t('detail.articleDraftImageCount')
+      : isDraftMode
+        ? t('detail.imageTextDraftImageCount')
+        : t('detail.imageCount')
 
     const selectedModelValues = isVideoMode ? selectedVideoModels : selectedImageModels
 
@@ -211,12 +215,17 @@ const ToolBarInline = memo(
 
     const handleImageModelToggle = useCallback((modelName: string) => {
       const isSelected = selectedImageModels.includes(modelName)
+      if (isArticleMode) {
+        if (!isSelected || selectedImageModels.length > 1)
+          onImageModelsChange([modelName])
+        return
+      }
       if (isSelected && selectedImageModels.length <= 1)
         return
       onImageModelsChange(isSelected
         ? selectedImageModels.filter(item => item !== modelName)
         : [...selectedImageModels, modelName])
-    }, [onImageModelsChange, selectedImageModels])
+    }, [isArticleMode, onImageModelsChange, selectedImageModels])
 
     const handleDurationChange = useCallback(
       ([val]: number[]) => {
@@ -271,7 +280,7 @@ const ToolBarInline = memo(
                 <Image className="h-3.5 w-3.5" />
               )}
               {isDraftMode
-                ? `${t('detail.draftModeOn')}(${isVideoMode ? t('detail.contentTypeVideo') : t('detail.contentTypeImageText')})`
+                ? `${t('detail.draftModeOn')}(${isVideoMode ? t('detail.contentTypeVideo') : isArticleMode ? t('detail.contentTypeArticle') : t('detail.contentTypeImageText')})`
                 : isVideoMode
                   ? t('detail.draftModeOffVideo')
                   : t('detail.draftModeOffImage')}
@@ -294,6 +303,13 @@ const ToolBarInline = memo(
                   icon: FileText,
                   isDraft: true,
                   ct: 'video' as const,
+                },
+                {
+                  key: 'draft_article',
+                  label: `${t('detail.draftModeOn')}(${t('detail.contentTypeArticle')})`,
+                  icon: FileText,
+                  isDraft: true,
+                  ct: 'article' as const,
                 },
               ].map(({ key, label, icon: Icon, isDraft, ct }) => {
                 const isActive = isDraftMode && contentType === ct
@@ -559,7 +575,7 @@ const ToolBarInline = memo(
         </Popover>
 
         {/* 图文模式：分辨率选择 pill */}
-        {!isVideoMode && imagePricing.length > 0 && (
+        {usesImageGeneration && imagePricing.length > 0 && (
           <Popover open={imageSizePopover.open} onOpenChange={imageSizePopover.onOpenChange}>
             <PopoverTrigger asChild>
               <button data-testid="draftbox-ai-resolution" type="button" className={pillClass}>
@@ -757,7 +773,7 @@ const ToolBarInline = memo(
           ))}
 
         {/* 图文模式：图片数量 pill */}
-        {!isVideoMode && (
+        {usesImageGeneration && (
           <Popover open={imageCountPopover.open} onOpenChange={imageCountPopover.onOpenChange}>
             <PopoverTrigger asChild>
               <button data-testid="draftbox-ai-image-count" type="button" className={pillClass}>
@@ -852,7 +868,7 @@ const ToolBarInline = memo(
           <div className="flex items-center gap-1.5">
             <Coins className="h-4 w-4 text-amber-500" />
             <span className="text-sm font-medium text-foreground">
-              {!isVideoMode && isPricingLoading ? '--' : totalCredits}
+              {usesImageGeneration && isPricingLoading ? '--' : totalCredits}
             </span>
             <button
               data-testid="draftbox-ai-submit-btn"

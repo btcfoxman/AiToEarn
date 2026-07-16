@@ -67,6 +67,7 @@ export interface IPubParmasTextareaProps {
   imagesMaxOverride?: number
   // 覆盖描述最大长度（优先于平台配置）
   desMaxOverride?: number
+  enableTopicMentions?: boolean
 }
 
 const PubParmasTextarea = memo(
@@ -90,6 +91,7 @@ const PubParmasTextarea = memo(
         toolbarExtra,
         imagesMaxOverride,
         desMaxOverride,
+        enableTopicMentions = true,
       }: IPubParmasTextareaProps,
       ref: ForwardedRef<IPubParmasTextareaRef>,
     ) => {
@@ -359,6 +361,7 @@ const PubParmasTextarea = memo(
                 onChange={value => setValue(value)}
                 placeholder={t('form.descriptionPlaceholder')}
                 maxLength={desMax}
+                enableTopicMentions={enableTopicMentions}
                 data-testid="publish-description-input"
               />
 
@@ -545,15 +548,17 @@ const PubParmasTextarea = memo(
             <div className="border-t border-border">
               <div className="p-2.5 px-4 relative flex items-center justify-between">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div
-                    className="flex items-center gap-2 text-xs text-muted-foreground"
-                    data-testid="publish-topic-hint"
-                  >
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-muted px-1.5 font-medium text-foreground">
-                      #
-                    </span>
-                    <span>{t('form.topicHint')}</span>
-                  </div>
+                  {enableTopicMentions && (
+                    <div
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                      data-testid="publish-topic-hint"
+                    >
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-muted px-1.5 font-medium text-foreground">
+                        #
+                      </span>
+                      <span>{t('form.topicHint')}</span>
+                    </div>
+                  )}
                   {/* 写作助手 - 移动端或指定隐藏 */}
                   {!isMobile && !hideWritingAssistant && (
                     <div className="px-1.5 border-l border-border first:border-l-0">

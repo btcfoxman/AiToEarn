@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common'
 import { AccountType } from '@yikart/common'
+import { AccountModule } from '../../account/account.module'
 import { ShortLinkModule } from '../../short-link/short-link.module'
+import { OrchestrationPublishCallbackController } from '../orchestration-publish/orchestration-publish-callback.controller'
+import { OrchestrationPublishClient } from '../orchestration-publish/orchestration-publish.client'
+import { OrchestrationPublishController } from '../orchestration-publish/orchestration-publish.controller'
 import { BilibiliModule } from '../platforms/bilibili/bilibili.module'
 import { ChannelSharedModule } from '../platforms/channel-shared.module'
 import { DouyinModule } from '../platforms/douyin/douyin.module'
@@ -25,10 +29,12 @@ import { GoogleBusinessPubService } from './providers/google-business.service'
 import { InstagramPublishService } from './providers/instgram.service'
 import { kwaiPubService } from './providers/kwai.service'
 import { LinkedinPublishService } from './providers/linkedin.service'
+import { OrchestrationPublishService } from './providers/orchestration.service'
 import { PinterestPubService } from './providers/pinterest.service'
 import { ThreadsPublishService } from './providers/threads.service'
 import { TiktokPubService } from './providers/tiktok.service'
 import { TwitterPubService } from './providers/twitter.service'
+import { WxGzhPublishRouterService } from './providers/wx-gzh-router.service'
 import { WxGzhPubService } from './providers/wx-gzh.service'
 import { YoutubePubService } from './providers/youtube.service'
 import { PublishingService } from './publishing.service'
@@ -38,6 +44,7 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
 @Module({
   imports: [
     ChannelSharedModule,
+    AccountModule,
     ShortLinkModule,
     BilibiliModule,
     PinterestModule,
@@ -72,6 +79,9 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
     TwitterPubService,
     DouyinPubService,
     GoogleBusinessPubService,
+    OrchestrationPublishClient,
+    OrchestrationPublishService,
+    WxGzhPublishRouterService,
     EnqueuePublishingTaskScheduler,
     PublishingStatusWatchdogScheduler,
     {
@@ -89,7 +99,8 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
         linkedin: LinkedinPublishService,
         douyin: DouyinPubService,
         googleBusiness: GoogleBusinessPubService,
-        wxGzh: WxGzhPubService,
+        wxGzhRouter: WxGzhPublishRouterService,
+        orchestration: OrchestrationPublishService,
       ) => ({
         [AccountType.BILIBILI]: bilibili,
         [AccountType.KWAI]: kwai,
@@ -103,7 +114,9 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
         [AccountType.LINKEDIN]: linkedin,
         [AccountType.Douyin]: douyin,
         [AccountType.GOOGLE_BUSINESS]: googleBusiness,
-        [AccountType.WxGzh]: wxGzh,
+        [AccountType.WxGzh]: wxGzhRouter,
+        [AccountType.WechatMoments]: orchestration,
+        [AccountType.Toutiao]: orchestration,
       }),
       inject: [
         BilibiliPubService,
@@ -118,11 +131,12 @@ import { PublishingStatusWatchdogScheduler } from './scheduler/publishing-status
         LinkedinPublishService,
         DouyinPubService,
         GoogleBusinessPubService,
-        WxGzhPubService,
+        WxGzhPublishRouterService,
+        OrchestrationPublishService,
       ],
     },
   ],
-  controllers: [],
+  controllers: [OrchestrationPublishController, OrchestrationPublishCallbackController],
   exports: [PublishingService, DouyinPubService],
 })
 export class PublishModule {}

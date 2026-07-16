@@ -3,6 +3,7 @@ export {
   CreateDraftGenerationVo as CreateDraftGenerationResponse,
   // DTOs
   InternalCreateDraftV2Dto as CreateDraftV2Request,
+  InternalCreateArticleDraftDto as CreateArticleDraftRequest,
   InternalCreateImageTextDraftDto as CreateImageTextDraftRequest,
   DraftGenerationPricingVo as DraftGenerationPricingResponse,
   DraftGenerationPricingVoSchema,

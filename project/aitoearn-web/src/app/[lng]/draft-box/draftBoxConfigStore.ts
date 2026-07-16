@@ -117,6 +117,10 @@ function normalizePersistedMedias(params: MaterialGenerationParams): IPersistedM
 }
 
 function inferContentType(params: MaterialGenerationParams, current: DraftBoxConfig): DraftContentType {
+  if (params.draftType === 'article') {
+    return 'article'
+  }
+
   if (params.imageModel || params.imageCount || params.imageSize) {
     return 'image_text'
   }
@@ -211,6 +215,7 @@ export const useDraftBoxConfigStore = createPersistStore(
         ? params.draftType === 'draft'
         : current.isDraftMode
       const nextCaptionPrompt = stripCaptionPromptSystemRequirement(params.captionPrompt ?? '')
+      const nextUsesImageGeneration = nextContentType === 'image_text' || nextContentType === 'article'
 
       queueConfigUpdate(get, set, groupId, {
         promptValue: params.prompt ? stripDraftPromptLimits(params.prompt) : '',
@@ -226,16 +231,16 @@ export const useDraftBoxConfigStore = createPersistStore(
         selectedVideoModels: nextContentType === 'video' && params.model
           ? [params.model]
           : current.selectedVideoModels,
-        imageModel: nextContentType === 'image_text'
+        imageModel: nextUsesImageGeneration
           ? (params.imageModel ?? current.imageModel)
           : current.imageModel,
-        selectedImageModels: nextContentType === 'image_text' && params.imageModel
+        selectedImageModels: nextUsesImageGeneration && params.imageModel
           ? [params.imageModel]
           : current.selectedImageModels,
-        imageCount: nextContentType === 'image_text'
+        imageCount: nextUsesImageGeneration
           ? (params.imageCount ?? current.imageCount)
           : current.imageCount,
-        imageSize: nextContentType === 'image_text'
+        imageSize: nextUsesImageGeneration
           ? (params.imageSize ?? current.imageSize)
           : current.imageSize,
         selectedPlatforms: params.platforms ? [...params.platforms] : [],

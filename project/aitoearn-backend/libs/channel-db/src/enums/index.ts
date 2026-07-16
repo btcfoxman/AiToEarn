@@ -6,6 +6,8 @@ export enum AccountType {
   KWAI = 'KWAI', // 快手
   YOUTUBE = 'youtube', // youtube
   WxGzh = 'wxGzh', // 微信公众号
+  WechatMoments = 'wechat_moments', // 微信朋友圈
+  Toutiao = 'toutiao', // 今日头条
   BILIBILI = 'bilibili', // B站
   TWITTER = 'twitter', // twitter
   TIKTOK = 'tiktok', // tiktok

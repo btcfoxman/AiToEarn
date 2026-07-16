@@ -112,6 +112,18 @@ const PLATFORM_CONSTRAINTS: Partial<Record<PlatType, PlatformConstraint>> = {
     ],
     imagesMax: 4,
   },
+  wxGzh: {
+    videoCategories: [],
+    imagesMax: 10,
+  },
+  wechat_moments: {
+    videoCategories: [],
+    imagesMax: 9,
+  },
+  toutiao: {
+    videoCategories: [],
+    imagesMax: 9,
+  },
   linkedin: {
     videoCategories: [
       {
@@ -196,6 +208,7 @@ export function checkPlatformCompatibility(
   const result = new Map<PlatType, string[]>()
   const { contentType, aspectRatio, duration, imageCount } = params
   const isVideoMode = contentType === 'video'
+  const isArticleMode = contentType === 'article'
 
   for (const plat of availablePlatforms) {
     const reasons: string[] = []
@@ -292,6 +305,18 @@ export function checkPlatformCompatibility(
               }
             }
           }
+        }
+      }
+    }
+    else if (isArticleMode) {
+      if (!platInfo.pubTypes.has(PubType.Article) && !platInfo.pubTypes.has(PubType.Weitoutiao)) {
+        reasons.push(t('detail.platformIncompatible.contentTypeNotSupported'))
+      }
+      else {
+        const constraint = PLATFORM_CONSTRAINTS[plat]
+        const maxImages = constraint?.imagesMax ?? platInfo.commonPubParamsConfig.imagesMax
+        if (maxImages !== undefined && imageCount > maxImages) {
+          reasons.push(t('detail.platformIncompatible.imageCountExceeded', { max: maxImages }))
         }
       }
     }

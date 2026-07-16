@@ -10,35 +10,39 @@ import {
   PASTE_COMMAND,
 } from 'lexical'
 import { BeautifulMentionNode } from 'lexical-beautiful-mentions'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
  * 插件：根据外部 value 同步更新编辑器内容
- * @param value - 外部传入的文本值
- * @param lastOutputValueRef - 编辑器最近一次通过 onChange 输出的值，用于判断 value 是否为内部回传
  */
 export function InitialValuePlugin({
   value,
   lastOutputValueRef,
+  enableTopicMentions = true,
 }: {
   value: string
   lastOutputValueRef?: MutableRefObject<string>
+  enableTopicMentions?: boolean
 }) {
   const [editor] = useLexicalComposerContext()
+  const lastTopicModeRef = useRef(enableTopicMentions)
 
   useEffect(() => {
+    const topicModeChanged = lastTopicModeRef.current !== enableTopicMentions
+
     // 如果 value 是编辑器自身 onChange 回传的，跳过（无竞态，ref 同步设置）
-    if (lastOutputValueRef && value === lastOutputValueRef.current) {
+    if (!topicModeChanged && lastOutputValueRef && value === lastOutputValueRef.current) {
       return
     }
 
     // 在 editor.update() 外部读取当前文本，避免空更新触发 OnChangePlugin
     const currentText = editor.getEditorState().read(() => $getRoot().getTextContent())
-    if (value === currentText) {
+    if (!topicModeChanged && value === currentText) {
       return
     }
 
     // 只在真正需要时才更新编辑器
+    lastTopicModeRef.current = enableTopicMentions
     editor.update(() => {
       const root = $getRoot()
       root.clear()
@@ -50,6 +54,18 @@ export function InitialValuePlugin({
       }
 
       // 按原顺序拆分：话题片段形如 "#xxx"
+      if (!enableTopicMentions) {
+        const lines = value.split(/\r?\n/)
+        lines.forEach((line, index) => {
+          const targetParagraph = index === 0 ? paragraph : $createParagraphNode()
+          if (index > 0) {
+            root.append(targetParagraph)
+          }
+          targetParagraph.append($createTextNode(line))
+        })
+        return
+      }
+
       const parts = value.split(/(#\S+)/g).filter(Boolean)
 
       parts.forEach((part) => {
@@ -68,7 +84,7 @@ export function InitialValuePlugin({
         }
       })
     })
-  }, [editor, value, lastOutputValueRef])
+  }, [editor, value, lastOutputValueRef, enableTopicMentions])
 
   return null
 }

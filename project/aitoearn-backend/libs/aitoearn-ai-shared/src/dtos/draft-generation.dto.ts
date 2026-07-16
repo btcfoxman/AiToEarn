@@ -13,6 +13,9 @@ export type DraftType = (typeof DRAFT_TYPES)[number]
 export const IMAGE_TEXT_DRAFT_TYPES = ['draft', 'image'] as const
 export type ImageTextDraftType = (typeof IMAGE_TEXT_DRAFT_TYPES)[number]
 
+export const ARTICLE_DRAFT_TYPES = ['article'] as const
+export type ArticleDraftType = (typeof ARTICLE_DRAFT_TYPES)[number]
+
 export const CreateDraftGenerationV2DtoSchema = z.object({
   quantity: z.number().int().min(1).max(10).default(1).describe('生成数量'),
   groupId: z.string().optional().describe('素材组 ID，为空时使用默认草稿箱'),
@@ -58,6 +61,24 @@ export const CreateImageTextDraftDtoSchema = z.object({
 })
 
 export class CreateImageTextDraftDto extends createZodDto(CreateImageTextDraftDtoSchema, 'CreateImageTextDraftDto') {}
+
+export const CreateArticleDraftDtoSchema = z.object({
+  quantity: z.number().int().min(1).max(10).default(1).describe('生成数量'),
+  groupId: z.string().optional().describe('素材组 ID，为空时使用默认草稿箱'),
+  prompt: z.string().max(4000).describe('文章草稿生成提示词'),
+  captionPrompt: z.string().max(2000).optional().describe('可选文案约束，用于标题、正文和话题'),
+  imageUrls: z.array(z.url()).max(14).optional().describe('reference image URLs'),
+  imageModel: z.string().optional().describe('optional image generation model for article illustrations'),
+  imageCount: z.number().int().min(1).max(9).optional().describe('optional article illustration count'),
+  imageSize: z.string().optional().describe('image resolution'),
+  aspectRatio: z.enum(IMAGE_TEXT_ASPECT_RATIOS).optional().describe('image aspect ratio'),
+  draftType: z.enum(ARTICLE_DRAFT_TYPES).default('article').describe('草稿类型：article 文章草稿'),
+  platforms: z.array(z.enum(AccountType)).optional().describe('目标平台列表，如 ["wxGzh", "toutiao"]'),
+  plannerModel: z.string().optional().describe('草稿规划模型名称'),
+  disableMemory: z.boolean().optional().default(true).describe('是否禁用用户记忆'),
+})
+
+export class CreateArticleDraftDto extends createZodDto(CreateArticleDraftDtoSchema, 'CreateArticleDraftDto') {}
 
 export const CreateDraftFromVideoUrlDtoSchema = z.object({
   videoUrl: z.url().describe('视频 URL，Gemini 将分析视频内容并生成草稿文案'),
@@ -107,6 +128,25 @@ const InternalCreateImageTextDraftSchema = z.object({
   disableMemory: z.boolean().optional().default(true).describe('是否禁用用户记忆'),
 })
 export class InternalCreateImageTextDraftDto extends createZodDto(InternalCreateImageTextDraftSchema, 'InternalCreateImageTextDraftDto') {}
+
+const InternalCreateArticleDraftSchema = z.object({
+  userId: z.string().describe('用户 ID'),
+  userType: z.enum(UserType).describe('用户类型'),
+  quantity: z.number().int().min(1).max(10).default(1).describe('生成数量'),
+  groupId: z.string().optional().describe('素材组 ID'),
+  prompt: z.string().max(4000).describe('文章草稿生成提示词'),
+  captionPrompt: z.string().max(2000).optional().describe('可选文案约束'),
+  imageUrls: z.array(z.url()).max(14).optional().describe('reference image URLs'),
+  imageModel: z.string().optional().describe('optional image generation model for article illustrations'),
+  imageCount: z.number().int().min(1).max(9).optional().describe('optional article illustration count'),
+  imageSize: z.string().optional().describe('image resolution'),
+  aspectRatio: z.enum(IMAGE_TEXT_ASPECT_RATIOS).optional().describe('image aspect ratio'),
+  draftType: z.enum(ARTICLE_DRAFT_TYPES).default('article').describe('草稿类型'),
+  platforms: z.array(z.enum(AccountType)).optional().describe('目标平台列表'),
+  plannerModel: z.string().optional().describe('草稿规划模型名称'),
+  disableMemory: z.boolean().optional().default(true).describe('是否禁用用户记忆'),
+})
+export class InternalCreateArticleDraftDto extends createZodDto(InternalCreateArticleDraftSchema, 'InternalCreateArticleDraftDto') {}
 
 const InternalGetDraftTaskSchema = z.object({
   userId: z.string().describe('用户 ID'),

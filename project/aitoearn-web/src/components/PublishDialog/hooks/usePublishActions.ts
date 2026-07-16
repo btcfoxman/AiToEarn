@@ -21,6 +21,10 @@ import { useCalendarTiming } from '@/app/[lng]/accounts/components/CalendarTimin
 import { AccountStatus } from '@/app/config/accountConfig'
 import { AccountPlatInfoMap, PlatType } from '@/app/config/platConfig'
 import { PubType } from '@/app/config/publishConfig'
+import {
+  getPublishItemSupportedContentTypes,
+  isArticlePublishItem,
+} from '@/components/PublishDialog/PublishDialog.util'
 import { usePublishDialogStorageStore } from '@/components/PublishDialog/usePublishDialogStorageStore'
 import { toast } from '@/lib/toast'
 import { PlatformTaskStatus, PLUGIN_SUPPORTED_PLATFORMS, usePluginStore } from '@/store/plugin'
@@ -78,6 +82,39 @@ function normalizePublishOption(item: PubItem) {
     option.facebook = {
       ...option.facebook,
       content_category: 'post',
+    }
+  }
+
+  if (item.account.externalProvider === 'ai-orchestration') {
+    const supportedContentTypes = getPublishItemSupportedContentTypes(item)
+    const requestedContentType = option.orchestration?.contentType
+    let contentType = requestedContentType
+
+    if (!contentType || !supportedContentTypes.includes(contentType)) {
+      if (item.account.type === PlatType.WechatMoments && (supportedContentTypes.length === 0 || supportedContentTypes.includes('image_text'))) {
+        contentType = 'image_text'
+      }
+      else if (
+        item.account.type === PlatType.WxGzh
+        && item.params.images?.length
+        && supportedContentTypes.includes('image_text')
+      ) {
+        contentType = 'image_text'
+      }
+      else if (item.account.type === PlatType.Toutiao && supportedContentTypes.includes('article')) {
+        contentType = 'article'
+      }
+      else {
+        contentType = supportedContentTypes.includes('article')
+          ? 'article'
+          : supportedContentTypes[0]
+      }
+    }
+
+    option.orchestration = {
+      ...option.orchestration,
+      publishTargetId: item.account.externalId || item.account.uid,
+      contentType,
     }
   }
 
@@ -192,10 +229,18 @@ export function usePublishActions({
     // 1. 先执行 API 发布（非插件支持平台）
     for (const item of apiPublishItems) {
       const normalizedOption = normalizePublishOption(item)
+      const isArticleContent = isArticlePublishItem({
+        ...item,
+        params: {
+          ...item.params,
+          option: normalizedOption,
+        },
+      })
+      const shouldDropTopics = isArticleContent || item.account.type === PlatType.WechatMoments
       const res = await apiCreatePublish({
-        topics: item.params.topics ?? [],
+        topics: shouldDropTopics ? [] : (item.params.topics ?? []),
         flowId: generateUUID(),
-        type: item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
+        type: isArticleContent ? PubType.ImageText : item.params.video?.cover.ossUrl ? PubType.VIDEO : PubType.ImageText,
         title: item.params.title || '',
         desc: item.params.des,
         accountId: item.account.id,

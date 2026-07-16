@@ -5,7 +5,7 @@ export interface DraftGenerationData {
   userId: string
   userType: UserType
   groupId: string
-  version: 'v2' | 'v2-image-text'
+  version: 'v2' | 'v2-image-text' | 'v2-article'
   prompt?: string
   captionPrompt?: string
   imageUrls?: string[]
@@ -19,6 +19,7 @@ export interface DraftGenerationData {
   imageSize?: string
   draftType?: 'draft' | 'video'
   imageTextDraftType?: 'draft' | 'image'
+  articleDraftType?: 'article'
   platforms?: string[]
   plannerModel?: string
   disableMemory?: boolean

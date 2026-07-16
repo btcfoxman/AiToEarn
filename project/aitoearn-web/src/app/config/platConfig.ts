@@ -10,7 +10,9 @@ import linkedinSvg from '@/assets/svgs/plat/linkedin.png'
 import pinterestSvg from '@/assets/svgs/plat/pinterest.png'
 import threadsSvg from '@/assets/svgs/plat/threads.png'
 import tiktokSvg from '@/assets/svgs/plat/tiktok.svg'
+import toutiaoSvg from '@/assets/svgs/plat/toutiao.svg'
 import twitterSvg from '@/assets/svgs/plat/twitter.png'
+import wxPyqSvg from '@/assets/svgs/plat/wx-pyq.svg'
 import wxSphSvg from '@/assets/svgs/plat/wx-sph.svg'
 import xhsSvg from '@/assets/svgs/plat/xhs.svg'
 import youtubeSvg from '@/assets/svgs/plat/youtube.png'
@@ -26,6 +28,8 @@ export enum PlatType {
   BILIBILI = 'bilibili', // B站
   Twitter = 'twitter', // Twitter
   WxGzh = 'wxGzh', // 微信公众号
+  WechatMoments = 'wechat_moments', // 微信朋友圈
+  Toutiao = 'toutiao',
   Facebook = 'facebook', // Facebook
   Instagram = 'instagram', // Instagram
   Threads = 'threads', // Threads
@@ -290,7 +294,7 @@ export const AccountPlatInfoMap = new Map<PlatType, IAccountPlatInfo>([
       name: 'wxgzh',
       icon: gzhSvg,
       url: 'https://mp.weixin.qq.com/',
-      pubTypes: new Set([PubType.ImageText]),
+      pubTypes: new Set([PubType.ImageText, PubType.Article]),
       commonPubParamsConfig: {
         titleMax: 64,
         topicMax: 0,
@@ -298,6 +302,38 @@ export const AccountPlatInfoMap = new Map<PlatType, IAccountPlatInfo>([
         imagesMax: 10,
       },
       themeColor: '#07C160',
+      jiancha: true,
+    },
+  ],
+  [
+    PlatType.WechatMoments,
+    {
+      name: '朋友圈',
+      icon: wxPyqSvg,
+      url: 'https://weixin.qq.com/',
+      pubTypes: new Set([PubType.ImageText]),
+      commonPubParamsConfig: {
+        topicMax: 100,
+        desMax: 2000,
+        imagesMax: 9,
+      },
+      themeColor: '#07C160',
+      jiancha: true,
+    },
+  ],
+  [
+    PlatType.Toutiao,
+    {
+      name: 'Toutiao',
+      icon: toutiaoSvg,
+      url: 'https://mp.toutiao.com/',
+      pubTypes: new Set([PubType.Article, PubType.Weitoutiao]),
+      commonPubParamsConfig: {
+        titleMax: 30,
+        topicMax: 5,
+        desMax: 10000,
+      },
+      themeColor: '#E93030',
       jiancha: true,
     },
   ],
@@ -309,7 +345,6 @@ export const AccountPlatInfoArr = Array.from(AccountPlatInfoMap)
 /** 不支持任务推广的平台 */
 export const TASK_EXCLUDED_PLATFORMS = new Set<PlatType>([
   PlatType.WxSph,
-  PlatType.WxGzh,
   PlatType.Pinterest,
   PlatType.LinkedIn,
 ])

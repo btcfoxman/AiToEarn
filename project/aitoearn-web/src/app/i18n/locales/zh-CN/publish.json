@@ -284,7 +284,8 @@
     "linkedinVideoDuration": "LinkedIn视频时长需为3秒–30分钟",
     "wxSphVideoSize": "微信视频号视频大小不能超过20GB",
     "wxSphVideoDuration": "微信视频号视频时长不能超过8小时",
-    "wxGzhImageSize": "微信公众号图片大小不能超过10MB"
+    "wxGzhImageSize": "微信公众号图片大小不能超过10MB",
+    "orchestrationFeatureBestEffort": "当前发布目标不支持或未声明支持：{{features}}，仍会继续发布文章，相关组件会由 ai-orchestration 按执行能力尽力插入。"
   },
   "preview": {
     "title": "预览",

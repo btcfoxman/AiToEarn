@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { AppException, COMMON_PROPAGATION_HEADERS, CommonResponse, propagationContext } from '@yikart/common'
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { AitoearnAiClientConfig } from '../aitoearn-ai-client.config'
+import { AitoearnAiClientConfig, DEFAULT_AI_CLIENT_TIMEOUT_MS } from '../aitoearn-ai-client.config'
 
 @Injectable()
 export class BaseService {
@@ -12,7 +12,7 @@ export class BaseService {
   ) {
     this.httpClient = axios.create({
       baseURL: this.config.baseUrl,
-      timeout: 30000,
+      timeout: this.config.timeout ?? DEFAULT_AI_CLIENT_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.token}`,

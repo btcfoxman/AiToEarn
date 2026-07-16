@@ -22,6 +22,10 @@ export const AccountSchema = z.object({
   nickname: z.string().describe('昵称'),
   status: z.enum(AccountStatus).describe('账号状态'),
   channelId: z.string().optional().describe('频道 ID'),
+  externalProvider: z.string().optional().describe('外部执行服务'),
+  externalId: z.string().optional().describe('外部账号/目标 ID'),
+  externalPlatform: z.string().optional().describe('外部平台'),
+  externalMeta: z.record(z.string(), z.any()).optional().describe('外部账号元数据'),
 })
 export interface Account extends z.infer<typeof AccountSchema> {}
 

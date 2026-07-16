@@ -4,11 +4,28 @@ set -euo pipefail
 APP_USER="${APP_USER:-btcfoxman}"
 APP_DIR="${APP_DIR:-/home/btcfoxman/docker/aitoearn}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
 
 log() {
   printf '[aitoearn-deploy] %s\n' "$*"
+}
+
+retry() {
+  local attempts="$1"
+  local delay="$2"
+  shift 2
+  local i
+  for i in $(seq 1 "${attempts}"); do
+    if "$@"; then
+      return 0
+    fi
+    if [ "${i}" -eq "${attempts}" ]; then
+      return 1
+    fi
+    log "Command failed, retrying in ${delay}s (${i}/${attempts}): $*"
+    sleep "${delay}"
+  done
 }
 
 read_env_value() {
@@ -54,6 +71,20 @@ ensure_rustfs_bucket() {
   fi
 }
 
+ensure_auto_login_token() {
+  if docker run --rm -v aitoearn-test-init-data:/data/init node:lts-alpine sh -c 'test -s /data/init/token.txt' >/dev/null 2>&1; then
+    log "Auto-login token already exists"
+    return 0
+  fi
+
+  log "Auto-login token missing; running init once"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 180 docker compose -f "${COMPOSE_FILE}" run --rm aitoearn-init
+  else
+    docker compose -f "${COMPOSE_FILE}" run --rm aitoearn-init
+  fi
+}
+
 if [ ! -d "${APP_DIR}" ]; then
   mkdir -p "${APP_DIR}"
 fi
@@ -86,23 +117,41 @@ fi
 
 if [ -n "${GHCR_TOKEN:-}" ]; then
   log "Logging in to GHCR"
-  printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME:-${GITHUB_ACTOR:-btcfoxman}}" --password-stdin >/dev/null
+  docker_login_ghcr() {
+    printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME:-${GITHUB_ACTOR:-btcfoxman}}" --password-stdin >/dev/null
+  }
+  retry 5 10 docker_login_ghcr
 fi
 
 log "Validating compose config"
 cd "${APP_DIR}"
-docker compose config >/dev/null
+export IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/btcfoxman/aitoearn}"
+export IMAGE_TAG="${IMAGE_TAG:-test-latest}"
+docker compose -f "${COMPOSE_FILE}" config >/dev/null
 
 log "Pulling images"
-docker compose pull
+pull_attempts="${PULL_ATTEMPTS:-12}"
+pull_delay="${PULL_DELAY:-20}"
+for service in aitoearn-ai aitoearn-server aitoearn-web; do
+  retry "${pull_attempts}" "${pull_delay}" docker compose -f "${COMPOSE_FILE}" pull "${service}"
+done
+
+for service in aitoearn-init nginx; do
+  if ! retry 5 "${pull_delay}" docker compose -f "${COMPOSE_FILE}" pull "${service}"; then
+    log "WARN: failed to refresh ${service}; continuing with the local image if present"
+  fi
+done
 
 log "Starting services"
-docker compose up -d --remove-orphans
+ensure_auto_login_token
+docker compose -f "${COMPOSE_FILE}" stop aitoearn-init >/dev/null 2>&1 || true
+docker compose -f "${COMPOSE_FILE}" rm -f aitoearn-init >/dev/null 2>&1 || true
+docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans aitoearn-ai aitoearn-server aitoearn-web nginx
 
 log "Waiting for nginx health"
 for i in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:${APP_PORT:-8081}/_nhealth" >/dev/null; then
-    docker compose ps
+    docker compose -f "${COMPOSE_FILE}" ps
     log "Deployment complete"
     exit 0
   fi
@@ -110,6 +159,6 @@ for i in $(seq 1 30); do
 done
 
 log "Health check failed"
-docker compose ps || true
-docker compose logs --tail=200 nginx aitoearn-web aitoearn-server aitoearn-ai || true
+docker compose -f "${COMPOSE_FILE}" ps || true
+docker compose -f "${COMPOSE_FILE}" logs --tail=200 nginx aitoearn-web aitoearn-server aitoearn-ai || true
 exit 1

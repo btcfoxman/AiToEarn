@@ -1,5 +1,8 @@
 export {
   ALL_ASPECT_RATIOS,
+  ARTICLE_DRAFT_TYPES,
+  CreateArticleDraftDto,
+  CreateArticleDraftDtoSchema,
   CreateDraftFromVideoUrlDto,
   CreateDraftFromVideoUrlDtoSchema,
   CreateDraftGenerationV2Dto,
@@ -20,4 +23,4 @@ export {
   RegenerateDraftGenerationMemoryDtoSchema,
 } from '@yikart/aitoearn-ai-shared'
 
-export type { DraftType, ImageTextDraftType } from '@yikart/aitoearn-ai-shared'
+export type { ArticleDraftType, DraftType, ImageTextDraftType } from '@yikart/aitoearn-ai-shared'

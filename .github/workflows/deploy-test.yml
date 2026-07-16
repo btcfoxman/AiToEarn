@@ -11,6 +11,7 @@ permissions:
   packages: write
 
 env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   IMAGE_TAG_LATEST: test-latest
   BACKEND_DIR: project/aitoearn-backend
   WEB_DIR: project/aitoearn-web
@@ -145,60 +146,54 @@ jobs:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       APP_DIR: /home/btcfoxman/docker/aitoearn
       APP_PORT: "8081"
-      ARCHIVE_PROXY_URLS: "http://127.0.0.1:10809 http://xray:10809 direct"
     steps:
-      - name: Download repository archive
+      - name: Fetch deployment files
         env:
-          ARCHIVE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECKOUT_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          work_dir="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}"
-          archive_path="${RUNNER_TEMP:-/tmp}/aitoearn-repo-${GITHUB_RUN_ID}.tar.gz"
+          repo_name="${GITHUB_REPOSITORY##*/}"
+          work_dir="${RUNNER_TEMP:-/tmp}/${repo_name}-repo-${GITHUB_RUN_ID}"
           rm -rf "${work_dir}"
           mkdir -p "${work_dir}"
 
-          archive_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}"
-          for i in 1 2 3 4 5; do
-            for proxy_url in ${ARCHIVE_PROXY_URLS}; do
-              rm -f "${archive_path}"
-              proxy_args=()
-              proxy_label="direct"
-              if [ "${proxy_url}" != "direct" ]; then
-                proxy_args=(--proxy "${proxy_url}")
-                proxy_label="${proxy_url}"
-              fi
+          auth_config="${work_dir}/.curl-auth"
+          {
+            printf 'header = "Authorization: Bearer %s"\n' "${CHECKOUT_TOKEN}"
+            printf 'header = "Accept: application/vnd.github.raw"\n'
+            printf 'header = "X-GitHub-Api-Version: 2022-11-28"\n'
+          } > "${auth_config}"
+          chmod 600 "${auth_config}"
 
-              echo "Downloading repository archive via ${proxy_label} (attempt ${i})"
-              if curl --fail --location --silent --show-error \
-                --connect-timeout 15 \
-                --max-time 900 \
-                --speed-limit 1024 \
-                --speed-time 60 \
-                --retry 2 \
-                --retry-delay 5 \
-                "${proxy_args[@]}" \
-                -H "Authorization: Bearer ${ARCHIVE_TOKEN}" \
-                -H "Accept: application/vnd.github+json" \
-                "${archive_url}" \
-                -o "${archive_path}" \
-                && tar -tzf "${archive_path}" >/dev/null 2>&1; then
-                echo "Repository archive downloaded via ${proxy_label}"
-                break 2
-              fi
-            done
+          download_file() {
+            local path="$1"
+            mkdir -p "${work_dir}/$(dirname "${path}")"
+            curl --config "${auth_config}" \
+              --fail --location --silent --show-error \
+              --retry 5 --retry-delay 5 --connect-timeout 20 --max-time 120 \
+              -o "${work_dir}/${path}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${GITHUB_SHA}"
+          }
 
-            if [ "${i}" -eq 5 ]; then
-              exit 1
-            fi
-            sleep $((i * 10))
+          for file in \
+            test/deploy.sh \
+            test/docker-compose.yml \
+            test/nginx.conf \
+            test/.env.example \
+            scripts/init.mjs \
+            scripts/init-package.json \
+            project/aitoearn-backend/apps/aitoearn-ai/config/config.js \
+            project/aitoearn-backend/apps/aitoearn-server/config/config.js
+          do
+            download_file "${file}"
           done
 
-          tar -xzf "${archive_path}" --strip-components=1 -C "${work_dir}"
-          rm -f "${archive_path}"
+          rm -f "${auth_config}"
+          chmod +x "${work_dir}/test/deploy.sh"
           echo "REPO_WORK_DIR=${work_dir}" >> "${GITHUB_ENV}"
 
       - name: Deploy
         run: |
           set -euo pipefail
           cd "${REPO_WORK_DIR}"
-          bash deploy/test/deploy.sh
+          bash test/deploy.sh

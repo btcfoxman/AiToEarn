@@ -14,6 +14,7 @@ import type {
 import type {
   DraftGenerationRequest,
   DraftGenerationTask,
+  ArticleDraftType,
   ImageModelType,
   ImageTextDraftType,
   VideoDraftType,
@@ -25,6 +26,7 @@ import { create } from 'zustand'
 import { combine } from 'zustand/middleware'
 import {
   apiCreateDraftGeneration,
+  apiCreateArticleDraft,
   apiCreateImageTextDraft,
   apiGetDraftGenerationList,
   apiGetDraftGenerationStats,
@@ -821,6 +823,80 @@ export const usePlanDetailStore = create(
             failedCount: failed.length,
             taskCount: placeholders.length,
             errorMessage: failed.map(getSettledErrorMessage).find(Boolean),
+          }
+        }
+        finally {
+          set({ isGeneratingBatch: false })
+        }
+      },
+
+      createArticleBatchGeneration: async (
+        quantity: number,
+        prompt: string,
+        overrideGroupId?: string,
+        platforms?: PlatType[],
+        draftType?: ArticleDraftType,
+        captionPrompt?: string,
+        imageModel?: ImageModelType,
+        imageCount?: number,
+        aspectRatio?: string,
+        imageUrls?: string[],
+        imageSize?: string,
+      ): Promise<BatchGenerationCreateResult> => {
+        const groupId = overrideGroupId || get().currentPlan?.id
+        if (!groupId) {
+          return { success: false, successCount: 0, failedCount: 1, taskCount: 0 }
+        }
+
+        set({ isGeneratingBatch: true })
+        try {
+          const res = await apiCreateArticleDraft({
+            quantity,
+            groupId,
+            prompt,
+            captionPrompt: captionPrompt || undefined,
+            imageModel,
+            imageCount,
+            imageUrls,
+            aspectRatio,
+            imageSize,
+            platforms: platforms?.length ? platforms : undefined,
+            draftType,
+          })
+
+          if (res?.code !== 0) {
+            return {
+              success: false,
+              successCount: 0,
+              failedCount: 1,
+              taskCount: 0,
+              errorMessage: res?.message || 'Failed to create generation task',
+            }
+          }
+
+          const taskIds = res.data?.taskIds || []
+          const placeholders = taskIds.map(id => buildDraftGenerationTaskPlaceholder(id, {
+            groupId,
+            prompt,
+            captionPrompt: captionPrompt || undefined,
+            imageModel,
+            imageCount,
+            imageUrls,
+            aspectRatio,
+            imageSize,
+            platforms,
+            draftType,
+          }))
+
+          if (placeholders.length > 0) {
+            methods.syncGenerationTasks(placeholders)
+          }
+
+          return {
+            success: taskIds.length > 0,
+            successCount: taskIds.length > 0 ? 1 : 0,
+            failedCount: 0,
+            taskCount: taskIds.length,
           }
         }
         finally {

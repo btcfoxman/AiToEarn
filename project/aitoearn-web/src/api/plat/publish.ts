@@ -6,6 +6,8 @@ import type {
 } from '@/api/plat/types/publish.types'
 import type { PlatType } from '@/app/config/platConfig'
 import type { IPlatOption } from '@/components/PublishDialog/publishDialog.type'
+import { PubType } from '@/app/config/publishConfig'
+import { isArticlePublishOption } from '@/components/PublishDialog/PublishDialog.util'
 import { parseTopicString } from '@/utils'
 import { request } from '@/utils/request'
 
@@ -14,7 +16,11 @@ function filterOptionByPlatform(option: IPlatOption, accountType: PlatType): IPl
   if (!option)
     return {}
   const key = accountType as keyof IPlatOption
-  return option[key] ? ({ [key]: option[key] } as IPlatOption) : {}
+  const filtered: IPlatOption = option[key] ? ({ [key]: option[key] } as IPlatOption) : {}
+  if (option.orchestration) {
+    filtered.orchestration = option.orchestration
+  }
+  return filtered
 }
 
 // 创建发布记录
@@ -37,11 +43,20 @@ export function updatePublishRecordLinkApi(data: UpdatePublishRecordLinkParams) 
 
 // 创建发布任务
 export function apiCreatePublish(data: PublishParams) {
-  const { topics, cleanedString } = parseTopicString(data.desc || '')
-  data.topics = [...new Set(data.topics?.concat(topics))]
-  data.desc = cleanedString
+  if (!isArticlePublishOption(data.option)) {
+    const { topics, cleanedString } = parseTopicString(data.desc || '')
+    data.topics = [...new Set((data.topics ?? []).concat(topics))]
+    data.desc = cleanedString
+  }
+  else {
+    data.topics = data.topics ?? []
+  }
 
   // 根据accountType过滤option参数
+  if (data.type === PubType.Article || data.type === PubType.Weitoutiao) {
+    data.type = PubType.ImageText
+  }
+
   data.option = filterOptionByPlatform(data.option, data.accountType)
 
   return request<{ id: string }>({

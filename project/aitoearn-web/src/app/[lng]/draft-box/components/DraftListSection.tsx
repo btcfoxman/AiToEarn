@@ -13,7 +13,7 @@ import type { PromotionMaterial } from '@/app/[lng]/brand-promotion/brandPromoti
 import type { PlatType } from '@/app/config/platConfig'
 import { ArrowRightLeft, Check, ListChecks, Plus, Trash2 } from 'lucide-react'
 import Image from 'next/image'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Masonry from 'react-masonry-css'
 import { useShallow } from 'zustand/react/shallow'
 import { usePlanDetailStore } from '@/app/[lng]/brand-promotion/planDetailStore'
@@ -83,7 +83,7 @@ interface DraftCardProps {
 // 草稿卡片组件（小红书风格）
 const DraftCard = memo(({ material, onClick, batchMode, selected, onToggleSelect, useCountLabel }: DraftCardProps) => {
   const { t } = useTransClient('brandPromotion')
-  const coverUrl = material.coverUrl || '/images/placeholder.png'
+  const coverUrl = material.coverUrl || ''
 
   const handleClick = useCallback(() => {
     if (batchMode) {
@@ -255,10 +255,7 @@ export const DraftListSection = memo(({
   }, [materialGroupId, resolvedDefaultTab])
 
   // 无限滚动加载触发器（使用 callback ref + state，确保 Tab 切换后 observer 能正确绑定）
-  const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(null)
-  const loadMoreCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    setLoadMoreElement(node)
-  }, [])
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const {
     materials,
@@ -357,6 +354,7 @@ export const DraftListSection = memo(({
 
   // IntersectionObserver 实现无限滚动
   useEffect(() => {
+    const loadMoreElement = loadMoreRef.current
     if (!loadMoreElement)
       return
 
@@ -375,7 +373,7 @@ export const DraftListSection = memo(({
     return () => {
       observer.disconnect()
     }
-  }, [loadMoreElement, materialsPagination.hasMore, materialsLoading, currentPlan, loadMoreMaterials])
+  }, [activeTab, materialsPagination.hasMore, materialsLoading, currentPlan, loadMoreMaterials])
 
   // 根据 activeTab 获取标题
   const getHeaderTitle = () => {
@@ -444,7 +442,7 @@ export const DraftListSection = memo(({
         </Masonry>
 
         {/* 加载触发器 */}
-        <div ref={loadMoreCallbackRef} />
+        <div ref={loadMoreRef} />
 
         {/* 加载更多指示器 */}
         {materialsLoading && <LoadingIndicator label={t('common.loading')} />}

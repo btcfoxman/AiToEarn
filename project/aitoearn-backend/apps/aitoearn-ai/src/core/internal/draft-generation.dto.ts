@@ -1,5 +1,6 @@
 export {
   InternalCreateDraftV2Dto,
+  InternalCreateArticleDraftDto,
   InternalCreateImageTextDraftDto,
   InternalGetDraftTaskDto,
   InternalListDraftTasksDto,

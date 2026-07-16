@@ -173,6 +173,18 @@ export class Account extends WithTimestampSchema {
 
   @Prop({ type: String, default: null })
   relayAccountRef: string | null
+
+  @Prop({ type: String, required: false, index: true })
+  externalProvider?: string
+
+  @Prop({ type: String, required: false, index: true })
+  externalId?: string
+
+  @Prop({ type: String, required: false })
+  externalPlatform?: string
+
+  @Prop({ type: MongooseSchema.Types.Mixed, required: false })
+  externalMeta?: Record<string, any>
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account)

@@ -24,6 +24,10 @@ const CreateAccountSchema = z.object({
   workCount: z.number().optional(),
   income: z.number().optional(),
   groupId: z.string().optional(),
+  externalProvider: z.string().optional(),
+  externalId: z.string().optional(),
+  externalPlatform: z.string().optional(),
+  externalMeta: z.record(z.string(), z.any()).optional(),
 })
 export class CreateAccountDto extends createZodDto(
   CreateAccountSchema,
@@ -52,6 +56,10 @@ const UpdateAccountSchema = z.object({
   workCount: z.number().optional(),
   income: z.number().optional(),
   groupId: z.string().optional(),
+  externalProvider: z.string().optional(),
+  externalId: z.string().optional(),
+  externalPlatform: z.string().optional(),
+  externalMeta: z.record(z.string(), z.any()).optional(),
 })
 export class UpdateAccountDto extends createZodDto(
   UpdateAccountSchema,

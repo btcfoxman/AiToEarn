@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { AitoearnAiClientService } from '@yikart/aitoearn-ai-client'
-import { CreateDraftGenerationV2DtoSchema, CreateImageTextDraftDtoSchema } from '@yikart/aitoearn-ai-shared'
+import { CreateArticleDraftDtoSchema, CreateDraftGenerationV2DtoSchema, CreateImageTextDraftDtoSchema } from '@yikart/aitoearn-ai-shared'
 import { getUser, toTextResult, toYamlTextResult, UserType } from '@yikart/common'
 import { Tool } from '@yikart/nest-mcp'
 import { z } from 'zod'
@@ -39,6 +39,21 @@ export class DraftGenerationMcpController {
       ...params,
     })
     return toTextResult(`Image-text draft generation started. Task IDs: ${result.taskIds.join(', ')}\nUse getDraftTaskStatus to check progress.`)
+  }
+
+  @Tool({
+    name: 'createArticleDraft',
+    description: 'Generate article content drafts using AI for WeChat Official Account and Toutiao publishing. Returns task IDs, use getDraftTaskStatus to check progress.',
+    parameters: CreateArticleDraftDtoSchema,
+  })
+  async createArticleDraft(params: z.infer<typeof CreateArticleDraftDtoSchema>) {
+    const user = getUser()
+    const result = await this.aiClientService.ai.createArticleDraft({
+      userId: user.id,
+      userType: UserType.User,
+      ...params,
+    })
+    return toTextResult(`Article draft generation started. Task IDs: ${result.taskIds.join(', ')}\nUse getDraftTaskStatus to check progress.`)
   }
 
   @Tool({
