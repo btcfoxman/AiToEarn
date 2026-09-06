@@ -57,6 +57,9 @@ jobs:
           src/core/internal/orchestration-outcome.spec.ts
           --reporter=verbose
 
+      - name: Check bounded deployment health contracts
+        run: node --test test/deploy-contract.test.mjs
+
       - name: Check approved publishing tenant boundary
         working-directory: ${{ env.BACKEND_DIR }}
         run: >-
