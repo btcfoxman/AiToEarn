@@ -5,6 +5,12 @@ on:
     branches:
       - test
   workflow_dispatch:
+    inputs:
+      run_server_browser_regression:
+        description: 'Opt in only on a browser-capable LAN host; normally run the full browser regression on the local workstation.'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -58,7 +64,7 @@ jobs:
           --reporter=verbose
 
       - name: Check bounded deployment health contracts
-        run: node --test test/deploy-contract.test.mjs test/cold-start-cancellation.test.mjs test/lan-resource-lock.test.mjs
+        run: node --test test/deploy-contract.test.mjs test/cold-start-cancellation.test.mjs test/lan-resource-lock.test.mjs test/storage-readiness.test.mjs
 
       - name: Check approved publishing tenant boundary
         working-directory: ${{ env.BACKEND_DIR }}
@@ -267,6 +273,7 @@ jobs:
           for file in \
             test/deploy.sh \
             test/lan-resource-lock.sh \
+            test/verify-storage-readiness.mjs \
             test/docker-compose.yml \
             test/nginx.conf \
             test/.env.example \
@@ -288,8 +295,41 @@ jobs:
           cd "${REPO_WORK_DIR}"
           exec bash test/deploy.sh
 
+  verify-deployed-page:
+    name: Verify deployed page availability (not browser acceptance)
+    needs: deploy
+    environment: test
+    runs-on:
+      - self-hosted
+      - linux
+      - aitoearn-test
+    timeout-minutes: 5
+    env:
+      AITOEARN_E2E_BASE_URL: ${{ vars.AITOEARN_E2E_BASE_URL || 'http://192.168.3.6:8081/zh-CN' }}
+    steps:
+      - name: Check application HTML without starting a server-side browser
+        run: |
+          set -euo pipefail
+          umask 077
+          body_file="$(mktemp)"
+          trap 'rm -f "${body_file}"' EXIT
+          for attempt in $(seq 1 12); do
+            if curl --fail --location --silent --show-error \
+              --connect-timeout 5 --max-time 15 \
+              --output "${body_file}" "${AITOEARN_E2E_BASE_URL}" \
+              && grep -qi '<html' "${body_file}" \
+              && grep -q '_next/static/' "${body_file}"; then
+              echo "Application HTML is reachable. Full browser acceptance runs on the local workstation; this check does not certify it."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Application HTML did not become ready within the bounded window"
+          exit 1
+
   verify-web-e2e:
-    name: Verify deployed web cold starts
+    name: Optional server browser cold-start regression
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_server_browser_regression }}
     needs: deploy
     environment: test
     runs-on:
