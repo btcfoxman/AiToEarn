@@ -119,6 +119,10 @@ export class OrchestrationDraftInternalController {
         },
         orchestration: {
           provider: 'ai-orchestration',
+          // Immutable final public snapshot used by the approved-intent bridge.
+          // Mutable material-box edits cannot silently change an approved post.
+          publicContent,
+          packageId: firstText(body.draft.package_id, body.draft.packageId),
           sourceKey,
           sourceId: draft.sourceId,
           requestSha256,

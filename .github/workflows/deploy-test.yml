@@ -54,7 +54,22 @@ jobs:
           --environment node
           src/core/internal/orchestration-draft-import.spec.ts
           src/core/internal/material.repository.import.spec.ts
+          src/core/internal/orchestration-outcome.spec.ts
           --reporter=verbose
+
+      - name: Check approved publishing tenant boundary
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: >-
+          pnpm exec vitest run
+          --config apps/aitoearn-server/vitest.config.mts
+          --environment node
+          src/core/channel/publishing/publishing.service.spec.ts
+          -t 'approved tenant scope'
+          --reporter=verbose
+
+      - name: Type-check publishing integration
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: pnpm exec tsc --noEmit -p apps/aitoearn-server/tsconfig.app.json
 
   quality-web:
     name: Test web state stability

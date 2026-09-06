@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { QueueService } from '@yikart/aitoearn-queue'
 import { AccountType, PublishStatus } from '@yikart/aitoearn-server-client'
 import { AppException, ResponseCode } from '@yikart/common'
-import { PublishRecord, PublishType } from '@yikart/mongodb'
+import { AccountStatus, PublishRecord, PublishType } from '@yikart/mongodb'
 import { youtube_v3 } from 'googleapis'
 import { v4 as uuidv4 } from 'uuid'
 import { PublishRecordService } from '../../publish-record/publish-record.service'
@@ -87,7 +87,7 @@ export class PublishingService {
    * 3. 处理 Meta 平台特殊逻辑
    * 4. 抖音平台立即发布，其他平台根据发布时间决定是否入队
    */
-  async createPublishingTask(publishData: CreatePublishDto) {
+  async createPublishingTask(publishData: CreatePublishDto, expectedUserId?: string) {
     // 发布参数验证
     const validateResult = await this.publishingProviders[publishData.accountType].validatePublishParams(publishData)
     if (!validateResult.success) {
@@ -111,6 +111,14 @@ export class PublishingService {
       publishData.accountId,
     )
     if (!accountInfo)
+      throw new AppException(ResponseCode.ChannelAccountInfoFailed)
+
+    // The internal approved-intent bridge supplies the authenticated tenant.
+    // Recheck after provider validation so an account transfer/disconnect cannot
+    // redirect a previously approved task into another user's account.
+    if (expectedUserId && (accountInfo.userId !== expectedUserId
+      || String(accountInfo.type) !== String(publishData.accountType)
+      || accountInfo.status !== AccountStatus.NORMAL))
       throw new AppException(ResponseCode.ChannelAccountInfoFailed)
 
     if (accountInfo.relayAccountRef) {

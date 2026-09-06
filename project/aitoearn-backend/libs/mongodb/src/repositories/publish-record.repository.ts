@@ -32,6 +32,11 @@ export interface PublishRecordPostDataCrawlerMonitorItem {
 
 @Injectable()
 export class PublishRecordRepository extends BaseRepository<PublishRecord> {
+  async listOrchestrationMaterialRecords(userId: string, materialId: string, limit = 100) {
+    return this.publishRecordModel.find({ userId, materialId }).sort({ createdAt: -1 })
+      .limit(Math.max(1, Math.min(limit, 101))).lean({ virtuals: true }).exec()
+  }
+
   constructor(
     @InjectModel(PublishRecord.name)
     private readonly publishRecordModel: Model<PublishRecord>,

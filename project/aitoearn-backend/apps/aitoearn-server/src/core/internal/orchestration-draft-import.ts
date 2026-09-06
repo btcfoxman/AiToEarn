@@ -178,6 +178,7 @@ const ACCOUNT_TYPE_ALIASES: Record<string, AccountType> = {
   'toutiao': AccountType.Toutiao,
   'toutiao_article': AccountType.Toutiao,
   'toutiao_micro': AccountType.Toutiao,
+  'weitoutiao': AccountType.Toutiao,
   'jinri_toutiao': AccountType.Toutiao,
   '今日头条': AccountType.Toutiao,
   '头条': AccountType.Toutiao,

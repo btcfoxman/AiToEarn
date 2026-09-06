@@ -22,6 +22,7 @@ vi.mock('@yikart/assets', () => ({
 vi.mock('@yikart/mongodb', () => ({
   mongodbConfigSchema: {},
   AccountRepository: class {},
+  AccountStatus: { NORMAL: 1, ABNORMAL: 0 },
   PublishType: { VIDEO: 'video', ARTICLE: 'article' },
   PublishStatus: {
     FAILED: -1,
@@ -103,6 +104,20 @@ function createService(accountInfo: unknown = {
 describe('publishingService media validation', () => {
   beforeEach(() => {
     probeRemoteFile.mockReset()
+  })
+
+  it.each([
+    { userId: 'other', type: AccountType.TWITTER, status: 1 },
+    { userId: 'user_1', type: AccountType.YOUTUBE, status: 1 },
+    { userId: 'user_1', type: AccountType.TWITTER, status: 0 },
+  ])('approved tenant scope is rechecked before record creation: %j', async (account) => {
+    const { service, publishRecordService } = createService(account)
+    await expect(service.createPublishingTask({
+      accountId: 'account_1', accountType: AccountType.TWITTER,
+      type: PublishType.ARTICLE, title: 'Approved', desc: 'Approved', topics: [],
+      publishTime: new Date(Date.now() + 3600000),
+    } as any, 'user_1')).rejects.toMatchObject({ code: ResponseCode.ChannelAccountInfoFailed })
+    expect(publishRecordService.createPublishRecord).not.toHaveBeenCalled()
   })
 
   it('账号无效时不会探测媒体 URL', async () => {
