@@ -8,7 +8,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
 source "${SCRIPT_DIR}/lan-resource-lock.sh"
-trap lan_resource_lock_cancel_wait EXIT
+STORAGE_INIT_CONTAINER=""
+cleanup_deploy_helpers() {
+  lan_resource_lock_cancel_wait
+  if [ -n "${STORAGE_INIT_CONTAINER}" ]; then
+    timeout --signal=TERM --kill-after=1s 5s docker rm -f "${STORAGE_INIT_CONTAINER}" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_deploy_helpers EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -86,7 +93,7 @@ ensure_rustfs_bucket() {
   local secret_key=""
 
   if [ -z "${bucket}" ]; then
-    log "WARN: RUSTFS_BUCKET is empty; skip RustFS bucket policy check"
+    log "WARN: RUSTFS_BUCKET is empty; skip optional administrator bucket initialization (business storage is checked separately)"
     return 0
   fi
 
@@ -103,14 +110,30 @@ ensure_rustfs_bucket() {
   fi
 
   if [ -z "${access_key}" ] || [ -z "${secret_key}" ]; then
-    log "WARN: RustFS credentials are missing; skip bucket policy check for ${bucket}"
+    log "WARN: administrator credentials are missing; skip optional RustFS bucket initialization (business storage is checked separately)"
     return 0
   fi
 
-  if docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c "mc alias set rustfs http://192.168.3.6:9000 \"${access_key}\" \"${secret_key}\" >/dev/null && mc mb rustfs/${bucket} --ignore-existing >/dev/null && mc anonymous set download rustfs/${bucket} >/dev/null"; then
-    log "RustFS bucket ${bucket} is ready for anonymous downloads"
+  STORAGE_INIT_CONTAINER="aitoearn-storage-bootstrap-$$"
+  if timeout --signal=TERM --kill-after=2s 20s docker run --rm --name "${STORAGE_INIT_CONTAINER}" --network host --entrypoint /bin/sh minio/mc:latest -c "mc alias set rustfs http://192.168.3.6:9000 \"${access_key}\" \"${secret_key}\" >/dev/null && mc mb rustfs/${bucket} --ignore-existing >/dev/null && mc anonymous set download rustfs/${bucket} >/dev/null" >/dev/null 2>&1; then
+    log "Optional administrator bucket initialization completed; business storage is checked separately"
   else
-    log "WARN: failed to create or configure RustFS bucket ${bucket}"
+    log "WARN: optional administrator bucket initialization failed; this does not establish business S3 readiness"
+  fi
+  if timeout --signal=TERM --kill-after=1s 5s docker rm -f "${STORAGE_INIT_CONTAINER}" >/dev/null 2>&1; then
+    STORAGE_INIT_CONTAINER=""
+  fi
+}
+
+verify_business_storage() {
+  # Read ASSETS_CONFIG inside the actual application container. Administrator
+  # RUSTFS_* variables and host env-file parsing must not select this target.
+  # HeadBucket proves authenticated bucket access, not PUT permission, CORS or
+  # anonymous downloads; a separately authorized upload smoke covers those.
+  log "Checking business S3 HeadBucket readiness (single attempt, bounded deadline)"
+  if ! timeout --signal=TERM --kill-after=2s 20s docker compose -f "${COMPOSE_FILE}" exec -T aitoearn-server node --input-type=module - < "${APP_DIR}/scripts/verify-storage-readiness.mjs"; then
+    log "ERROR: business_storage_readiness_failed; deployment is not ready"
+    return 1
   fi
 }
 
@@ -130,6 +153,11 @@ ensure_auto_login_token() {
 
 lan_resource_lock_acquire
 
+if ! command -v timeout >/dev/null 2>&1; then
+  log "ERROR: timeout is required for bounded storage readiness checks"
+  exit 1
+fi
+
 if [ ! -d "${APP_DIR}" ]; then
   mkdir -p "${APP_DIR}"
 fi
@@ -139,6 +167,7 @@ mkdir -p "${APP_DIR}/config" "${APP_DIR}/scripts" "${APP_DIR}/logs" "${APP_DIR}/
 cp -f "${SCRIPT_DIR}/docker-compose.yml" "${COMPOSE_FILE}"
 cp -f "${REPO_ROOT}/scripts/init.mjs" "${APP_DIR}/scripts/init.mjs"
 cp -f "${REPO_ROOT}/scripts/init-package.json" "${APP_DIR}/scripts/init-package.json"
+cp -f "${SCRIPT_DIR}/verify-storage-readiness.mjs" "${APP_DIR}/scripts/verify-storage-readiness.mjs"
 cp -f "${REPO_ROOT}/project/aitoearn-backend/apps/aitoearn-ai/config/config.js" "${APP_DIR}/config/aitoearn-ai.config.js"
 cp -f "${REPO_ROOT}/project/aitoearn-backend/apps/aitoearn-server/config/config.js" "${APP_DIR}/config/aitoearn-server.config.js"
 
@@ -198,6 +227,8 @@ ensure_auto_login_token
 docker compose -f "${COMPOSE_FILE}" stop aitoearn-init >/dev/null 2>&1 || true
 docker compose -f "${COMPOSE_FILE}" rm -f aitoearn-init >/dev/null 2>&1 || true
 docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans aitoearn-ai aitoearn-server aitoearn-web nginx
+
+verify_business_storage
 
 log "Waiting for nginx health"
 for i in $(seq 1 30); do
