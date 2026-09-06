@@ -332,9 +332,9 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${GITHUB_SHA}"
           }
 
-          download_file "${WEB_DIR}/package.json" "${work_dir}/package.json"
-          download_file "${WEB_DIR}/pnpm-lock.yaml" "${work_dir}/pnpm-lock.yaml"
-          download_file "${WEB_DIR}/pnpm-workspace.yaml" "${work_dir}/pnpm-workspace.yaml"
+          download_file "test/cold-start/package.json" "${work_dir}/package.json"
+          download_file "test/cold-start/pnpm-lock.yaml" "${work_dir}/pnpm-lock.yaml"
+          download_file "test/run-cold-start-regression.sh" "${work_dir}/run-cold-start-regression.sh"
           download_file \
             "${WEB_DIR}/tests/e2e/cold-start-stability.spec.ts" \
             "${work_dir}/tests/e2e/cold-start-stability.spec.ts"
@@ -367,46 +367,4 @@ jobs:
       - name: Run deployed cold-start regression
         run: |
           set -euo pipefail
-          results_dir="${RUNNER_TEMP:-/tmp}/aitoearn-e2e-results-${GITHUB_RUN_ID}"
-          rm -rf "${results_dir}"
-          mkdir -p "${results_dir}"
-
-          pull_image() {
-            docker pull "${PLAYWRIGHT_IMAGE}"
-          }
-          for attempt in $(seq 1 5); do
-            if pull_image; then
-              break
-            fi
-            if [ "${attempt}" -eq 5 ]; then
-              echo "::error::Failed to pull ${PLAYWRIGHT_IMAGE}"
-              exit 1
-            fi
-            sleep 10
-          done
-
-          docker run --rm --init --ipc=host --network host \
-            --env AITOEARN_E2E_BASE_URL \
-            --env AITOEARN_E2E_ATTEMPTS \
-            --volume "${E2E_WORK_DIR}:/work:ro" \
-            --volume "${results_dir}:/results" \
-            "${PLAYWRIGHT_IMAGE}" \
-            bash -lc '
-              set -euo pipefail
-              cp -R /work /tmp/aitoearn-e2e
-              cd /tmp/aitoearn-e2e
-              corepack enable
-              corepack prepare pnpm@10 --activate
-              pnpm install --frozen-lockfile --ignore-scripts
-              set +e
-              pnpm exec playwright test \
-                tests/e2e/cold-start-stability.spec.ts \
-                --output=/results \
-                --workers=1 \
-                --trace=retain-on-failure \
-                --reporter=line
-              status=$?
-              set -e
-              chmod -R a+rX /results || true
-              exit "${status}"
-            '
+          bash "${E2E_WORK_DIR}/run-cold-start-regression.sh"
