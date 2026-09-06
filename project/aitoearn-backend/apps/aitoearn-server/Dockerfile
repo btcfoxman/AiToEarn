@@ -1,10 +1,14 @@
 FROM node:24-alpine AS deps
 
-RUN npm install -g pnpm
+# Keep the image installer aligned with package.json's packageManager.
+# An unpinned pnpm can upgrade its lockfile/engine protocol between builds.
+RUN npm install -g pnpm@10.33.0
 
 WORKDIR /app
 
 COPY deps/ ./
+
+RUN test "pnpm@$(pnpm --version)" = "$(node -p 'require("./package.json").packageManager')"
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod
 
