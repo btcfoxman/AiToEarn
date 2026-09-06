@@ -58,7 +58,7 @@ jobs:
           --reporter=verbose
 
       - name: Check bounded deployment health contracts
-        run: node --test test/deploy-contract.test.mjs test/cold-start-cancellation.test.mjs
+        run: node --test test/deploy-contract.test.mjs test/cold-start-cancellation.test.mjs test/lan-resource-lock.test.mjs
 
       - name: Check approved publishing tenant boundary
         working-directory: ${{ env.BACKEND_DIR }}
@@ -266,6 +266,7 @@ jobs:
 
           for file in \
             test/deploy.sh \
+            test/lan-resource-lock.sh \
             test/docker-compose.yml \
             test/nginx.conf \
             test/.env.example \
@@ -285,7 +286,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "${REPO_WORK_DIR}"
-          bash test/deploy.sh
+          exec bash test/deploy.sh
 
   verify-web-e2e:
     name: Verify deployed web cold starts
@@ -335,6 +336,7 @@ jobs:
           download_file "test/cold-start/package.json" "${work_dir}/package.json"
           download_file "test/cold-start/pnpm-lock.yaml" "${work_dir}/pnpm-lock.yaml"
           download_file "test/run-cold-start-regression.sh" "${work_dir}/run-cold-start-regression.sh"
+          download_file "test/lan-resource-lock.sh" "${work_dir}/lan-resource-lock.sh"
           download_file \
             "${WEB_DIR}/tests/e2e/cold-start-stability.spec.ts" \
             "${work_dir}/tests/e2e/cold-start-stability.spec.ts"

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lan-resource-lock.sh"
 
 : "${E2E_WORK_DIR:?E2E_WORK_DIR is required}"
 : "${GITHUB_RUN_ID:?GITHUB_RUN_ID is required}"
@@ -15,12 +18,15 @@ export AITOEARN_E2E_ATTEMPTS
 # This name is exclusive to this run/attempt, so cancellation cannot stop an app.
 container_name="aitoearn-cold-start-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
 results_dir="${RUNNER_TEMP:-/tmp}/aitoearn-e2e-results-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
-mkdir -p "${results_dir}"
 active_pid=""
+container_started=false
 cleanup() {
   # Run cancellation must not wait behind a foreground Docker client.
   trap '' INT TERM
-  timeout --kill-after=1s 6s docker rm -f "${container_name}" >/dev/null 2>&1 || true
+  lan_resource_lock_cancel_wait
+  if [ "${container_started}" = true ]; then
+    timeout --kill-after=1s 6s docker rm -f "${container_name}" >/dev/null 2>&1 || true
+  fi
   if [ -n "${active_pid:-}" ]; then
     for child in $(jobs -pr); do
       if [ "${child}" = "${active_pid}" ]; then
@@ -43,6 +49,9 @@ run_cancellable() {
   return "${status}"
 }
 
+lan_resource_lock_acquire
+mkdir -p "${results_dir}"
+
 for attempt in 1 2 3; do
   if run_cancellable timeout --kill-after=20s 180s docker pull "${PLAYWRIGHT_IMAGE}"; then
     break
@@ -56,6 +65,7 @@ done
 
 # Single browser worker; capped CPU/RAM, no additional swap or host shared memory.
 # Only the tiny, locked Playwright package is installed, never the Next workspace.
+container_started=true
 run_cancellable timeout --signal=TERM --kill-after=30s 2100s docker run --rm --init \
   --name "${container_name}" --network host \
   --cpus=1 --memory=1g --memory-swap=1g --pids-limit=256 --shm-size=256m \

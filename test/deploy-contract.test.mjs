@@ -67,3 +67,22 @@ test('LAN browser regression is serial, resource capped and cleans only its own 
   assert.match(runner, /240s pnpm install --frozen-lockfile/)
   assert.match(runner, /1800s pnpm exec playwright test/)
 })
+
+test('deployment and browser regression share a bounded host lock before mutations', () => {
+  const lock = readFileSync(new URL('./lan-resource-lock.sh', import.meta.url), 'utf8')
+  const regression = readFileSync(new URL('./run-cold-start-regression.sh', import.meta.url), 'utf8')
+  const workflow = readFileSync(new URL('../.github/workflows/deploy-test.yml', import.meta.url), 'utf8')
+  assert.match(lock, /LAN_RESOURCE_LOCK_FILE="\/home\/btcfoxman\/docker\/\.ai-marketing-test-deploy\.lock"/)
+  assert.match(lock, /exec 200>>"\$\{LAN_RESOURCE_LOCK_FILE\}"/)
+  assert.match(lock, /flock -w 1200 200 &/)
+  assert.match(lock, /wait "\$\{LAN_RESOURCE_LOCK_WAIT_PID\}"/)
+  assert.match(lock, /-L "\$\{LAN_RESOURCE_LOCK_FILE\}"/)
+  assert.doesNotMatch(lock, /^\s*(?:rm|unlink)\s/m)
+  for (const script of [deploy, regression]) {
+    assert.match(script, /umask 077/)
+    assert.match(script, /source "\$\{SCRIPT_DIR\}\/lan-resource-lock\.sh"/)
+    assert.ok(script.indexOf('\nlan_resource_lock_acquire\n') < script.indexOf('\nmkdir -p'))
+  }
+  assert.match(workflow, /test\/lan-resource-lock\.sh/)
+  assert.match(workflow, /exec bash test\/deploy\.sh/)
+})

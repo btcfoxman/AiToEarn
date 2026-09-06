@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 APP_USER="${APP_USER:-btcfoxman}"
 APP_DIR="${APP_DIR:-/home/btcfoxman/docker/aitoearn}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
+source "${SCRIPT_DIR}/lan-resource-lock.sh"
+trap lan_resource_lock_cancel_wait EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 log() {
   printf '[aitoearn-deploy] %s\n' "$*"
@@ -122,6 +127,8 @@ ensure_auto_login_token() {
     docker compose -f "${COMPOSE_FILE}" run --rm aitoearn-init
   fi
 }
+
+lan_resource_lock_acquire
 
 if [ ! -d "${APP_DIR}" ]; then
   mkdir -p "${APP_DIR}"
