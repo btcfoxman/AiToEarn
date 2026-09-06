@@ -16,15 +16,35 @@ export AITOEARN_E2E_ATTEMPTS
 container_name="aitoearn-cold-start-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
 results_dir="${RUNNER_TEMP:-/tmp}/aitoearn-e2e-results-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
 mkdir -p "${results_dir}"
+active_pid=""
 cleanup() {
-  timeout --kill-after=5s 20s docker rm -f "${container_name}" >/dev/null 2>&1 || true
+  # Run cancellation must not wait behind a foreground Docker client.
+  trap '' INT TERM
+  timeout --kill-after=1s 6s docker rm -f "${container_name}" >/dev/null 2>&1 || true
+  if [ -n "${active_pid:-}" ]; then
+    for child in $(jobs -pr); do
+      if [ "${child}" = "${active_pid}" ]; then
+        kill -TERM "${child}" >/dev/null 2>&1 || true
+      fi
+    done
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+run_cancellable() {
+  "$@" &
+  active_pid=$!
+  local status=0
+  # Bash runs signal traps immediately while waiting with its wait builtin.
+  wait "${active_pid}" || status=$?
+  active_pid=""
+  return "${status}"
+}
+
 for attempt in 1 2 3; do
-  if timeout --kill-after=20s 180s docker pull "${PLAYWRIGHT_IMAGE}"; then
+  if run_cancellable timeout --kill-after=20s 180s docker pull "${PLAYWRIGHT_IMAGE}"; then
     break
   fi
   if [ "${attempt}" -eq 3 ]; then
@@ -36,7 +56,7 @@ done
 
 # Single browser worker; capped CPU/RAM, no additional swap or host shared memory.
 # Only the tiny, locked Playwright package is installed, never the Next workspace.
-timeout --signal=TERM --kill-after=30s 2100s docker run --rm --init \
+run_cancellable timeout --signal=TERM --kill-after=30s 2100s docker run --rm --init \
   --name "${container_name}" --network host \
   --cpus=1 --memory=1g --memory-swap=1g --pids-limit=256 --shm-size=256m \
   --env AITOEARN_E2E_BASE_URL --env AITOEARN_E2E_ATTEMPTS \

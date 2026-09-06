@@ -58,7 +58,7 @@ jobs:
           --reporter=verbose
 
       - name: Check bounded deployment health contracts
-        run: node --test test/deploy-contract.test.mjs
+        run: node --test test/deploy-contract.test.mjs test/cold-start-cancellation.test.mjs
 
       - name: Check approved publishing tenant boundary
         working-directory: ${{ env.BACKEND_DIR }}
@@ -367,4 +367,4 @@ jobs:
       - name: Run deployed cold-start regression
         run: |
           set -euo pipefail
-          bash "${E2E_WORK_DIR}/run-cold-start-regression.sh"
+          exec bash "${E2E_WORK_DIR}/run-cold-start-regression.sh"

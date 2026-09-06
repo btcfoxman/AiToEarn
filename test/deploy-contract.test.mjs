@@ -48,6 +48,7 @@ test('LAN regression installs only the image-matched Playwright dependency', () 
   assert.match(e2e, /test\/cold-start\/pnpm-lock\.yaml/)
   assert.doesNotMatch(e2e, /\$\{WEB_DIR\}\/package\.json|\$\{WEB_DIR\}\/pnpm-lock\.yaml/)
   assert.match(e2e, /timeout-minutes: 40/)
+  assert.match(e2e, /exec bash "\$\{E2E_WORK_DIR\}\/run-cold-start-regression\.sh"/)
 })
 
 test('LAN browser regression is serial, resource capped and cleans only its own container', () => {
